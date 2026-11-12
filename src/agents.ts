@@ -3,6 +3,8 @@ import { basename, join, resolve } from "node:path";
 
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 
+import { MAIN_LABEL } from "./state";
+
 /**
  * Local agent files are the operator's own text, but the body goes straight into
  * the system prompt. Upstream applies this ceiling to third-party package
@@ -11,12 +13,12 @@ import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 const MAX_AGENT_FILE_BYTES = 1_048_576;
 
 /**
- * The label of pi's built-in agent. The footer label is the identity of the
- * selected agent, so an agent may not claim the reset position. Kept as a plain
- * lower-case literal because the label constant itself arrives with the cycle
- * list in a later increment.
+ * The reserved name: an agent may not claim the reset position, because the footer
+ * label is the identity of the selected agent. Derived from `MAIN_LABEL` rather
+ * than written out again, so the skipped name and the cycle's `Main` stop can
+ * never disagree.
  */
-const RESERVED_AGENT_NAME = "main";
+const RESERVED_AGENT_NAME = MAIN_LABEL.toLowerCase();
 
 const AGENT_FILE_EXTENSION = ".md";
 

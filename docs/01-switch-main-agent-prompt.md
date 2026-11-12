@@ -494,6 +494,9 @@ Gate: open.
 | `enabled: false` agents stay in the loader result; the cycle filters them (stage 3) | code review round 1, accepted | 2026-11-12 |
 | Symlink rejection added beyond the original skip list | code review round 1 | 2026-11-12 |
 | Stage 2 committed: criteria 3, 4, 5 asserted; three follow-ups logged (empty-body case, reference comparison, trim twice) | code review, `✅` | 2026-11-12 |
+| Stage 3 comparator uses `localeCompare(…, "en", { sensitivity: "accent" })`, not the plan's plain `localeCompare(…, "en")` — the plain form reorders names differing only in case | code review round 1 + implementer | 2026-11-12 |
+| Stage 3 committed: the tie case was rebuilt so it fails under the plain comparator (`Ranger` before `ranger` in discovery order) | code review round 2, `✅` | 2026-11-12 |
+| `MAIN_LABEL` from `state.ts` is the single source for the reserved name; `agents.ts` derives from it | implementer, reviewed | 2026-11-12 |
 | `applyAgentToPromptOptions` takes `AgentDefinition \| null` for `Main`; `loadAgents` gains an optional `options` argument | architect, accepted by orchestrator | 2026-11-12 |
 | The `AGENTS.md` acceptance block is edited by the orchestrator, not the implementer | orchestrator | 2026-11-12 |
 | `Key` is not re-exported by `pi-coding-agent`; the shortcut uses the literal `"ctrl+shift+a"`, so `pi-tui` stays out | architect | 2026-11-12 |
