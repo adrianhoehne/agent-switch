@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "es2023",
+    "types": ["node"],
+    // pi's declaration files pull in @google/genai, whose own types import
+    // @modelcontextprotocol/sdk — not installed, and not ours to depend on.
+    "skipLibCheck": true
+  },
+  "include": ["src", "test", "*.config.ts"]
+}

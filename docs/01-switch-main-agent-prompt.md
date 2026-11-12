@@ -96,7 +96,8 @@ Rules fixed here:
   into a `ctx.ui.notify` warning: unparseable frontmatter (`parseFrontmatter`
   throws), an empty prompt body (pi ignores a falsy `customPrompt`, so the footer
   would lie), a name that is `Main` in any casing (the label is the identity, and
-  `Main` is the reset position), a non-regular file, and a file above 1 MiB. The
+  `Main` is the reset position), a symlink, a non-regular file, and a file above
+  1 MiB. The
   upstream ceiling is 1 MiB for *package* resources only; applying it to local files
   as well is a deliberate stricter choice here, because the body goes straight into
   the system prompt.
@@ -153,6 +154,7 @@ call still works" is part of the manual check.
 | | `agent named Main is skipped` | the label `Main` stays the reset position |
 | | `oversized file is skipped` | the 1 MiB ceiling holds |
 | | `non-regular file is skipped` | a directory or fifo named `*.md` is not read |
+| | `symlinked file is skipped` | a link cannot point the prompt at content outside |
 | | `unreadable directory counts as empty` | a permission error is not a crash |
 | `test/state.test.ts` | `cycle starts at Main` / `cycle wraps to Main` | order and wrap-around |
 | | `cycle sorts agents by name` | the sort half of criterion 6 |
@@ -488,6 +490,9 @@ Gate: open.
 | 1 MiB ceiling applied to local files too, stricter than upstream | spec review round 2 | 2026-11-12 |
 | Sort ties keep discovery order | spec review round 2 | 2026-11-12 |
 | Spec approved — gate open | spec review round 2 | 2026-11-12 |
+| Stage 1 committed: `.gitignore` added by the orchestrator (no behavioural effect); `skipLibCheck: true` and `target: es2023` in `tsconfig.json` accepted as necessary | code review round 1 + 2 | 2026-11-12 |
+| `enabled: false` agents stay in the loader result; the cycle filters them (stage 3) | code review round 1, accepted | 2026-11-12 |
+| Symlink rejection added beyond the original skip list | code review round 1 | 2026-11-12 |
 | `applyAgentToPromptOptions` takes `AgentDefinition \| null` for `Main`; `loadAgents` gains an optional `options` argument | architect, accepted by orchestrator | 2026-11-12 |
 | The `AGENTS.md` acceptance block is edited by the orchestrator, not the implementer | orchestrator | 2026-11-12 |
 | `Key` is not re-exported by `pi-coding-agent`; the shortcut uses the literal `"ctrl+shift+a"`, so `pi-tui` stays out | architect | 2026-11-12 |
