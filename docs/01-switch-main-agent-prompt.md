@@ -1,19 +1,21 @@
 ---
 description: Cycles the main agent's system prompt through the agent definition files on ctrl+shift+a, effective on the next message, keeping project context and conversation history intact.
-status: proposed
+status: active
 ---
 
 # 01 — Cycle the main agent's system prompt mid-conversation
 
+Implemented on 2026-11-12. All thirteen acceptance criteria are met; the live
+session check is recorded in `## Log`.
+
 ## Goal
 
-Today the main agent of a pi session keeps the system prompt it started with. A
-person who wants the same transcript answered by a different agent has to start a
-new session and lose the conversation. This increment adds a cycle on `ctrl+shift+a`:
-`Main` (the untouched pi prompt), then each agent definition found on the machine.
-The footer shows the current name. The next message is composed with that agent's
-prompt body as the role prompt, while project context, tool availability and the
-conversation stay as they are.
+The main agent of a pi session changes the system prompt it answers with, without
+restarting the session. `ctrl+shift+a` cycles through `Main` — pi's own prompt — and
+the agent definitions found on the machine; the footer names the active one. From
+the next message on, the request carries that agent's prompt body as its role
+prompt. Project context (this file, the skill catalogue, the working directory)
+stays in the request, and the conversation is never rewritten.
 
 ## Behaviour, as decided against the opencode reference
 
@@ -231,14 +233,8 @@ Exact versions live in `package-lock.json`; `npm install` is the only setup step
 
 ## Open questions
 
-- **Package tier deferred.** The operator's original decision was all four
-  discovery sources; on the same day the operator agreed to defer the package tier
-  explicitly. It is not implemented in this increment: it needs pi's package
-  manifest reader, the project-trust decision and a size ceiling, and no installed
-  package declares an agent today. A named follow-up, not an oversight.
-- **Known follow-up, deliberately outside this spec:** whether adopting `model`,
-  `thinking` and `tools` from the agent file is wanted ("part 2"; opencode ties the
-  model to the agent and switches it along).
+None. Both follow-ups are recorded under `## Known gaps`; neither is a decision
+waiting for someone.
 
 ## Known gaps
 
@@ -253,6 +249,8 @@ increment; each is a follow-up with its reason.
 | `lastSelectedLabel` reads `getEntries()` (whole session) rather than `getBranch()` | a branched session can restore a label from an abandoned branch (spec review round 1) |
 | `lstatSync` and the later `readFileSync` are not atomic | a file swapped to a symlink between the two calls would still be read; closing it needs `openSync` + `fstat` |
 | The tie case discriminates only under full-ICU Node | a `small-icu` build returns `0` for both comparators and the lock disappears silently |
+| **Package tier not implemented** | the operator decided on 2026-11-12 to defer it: it needs pi's package manifest reader, the project-trust decision and a size ceiling, and no installed package declares an agent today. `source: "package"` and the `packageDirs` seam are in place for it |
+| **`model`, `thinking` and `tools` of the agent file are not adopted** | the operator asked for the system prompt only; opencode ties the model to the agent and switches it along — that is "part 2", a separate spec |
 
 ## Dev plan
 
@@ -511,6 +509,11 @@ Gate: open.
 | Stage 3 comparator uses `localeCompare(…, "en", { sensitivity: "accent" })`, not the plan's plain `localeCompare(…, "en")` — the plain form reorders names differing only in case | code review round 1 + implementer | 2026-11-12 |
 | Stage 3 committed: the tie case was rebuilt so it fails under the plain comparator (`Ranger` before `ranger` in discovery order) | code review round 2, `✅` | 2026-11-12 |
 | `MAIN_LABEL` from `state.ts` is the single source for the reserved name; `agents.ts` derives from it | implementer, reviewed | 2026-11-12 |
+| Stage 4 committed (wiring) and stage 5 (`AGENTS.md` acceptance block); both code reviews `✅` | code review | 2026-11-12 |
+| Live check, `pi --extension ./src/extension.ts`: footer `Main`; four presses `Main → architect → grizzled-senior-dev → ranger-1 → Main`; answer came from `AGENTS.md` (roles and gates); a `read` tool call worked under `replace`; no chat entry for the switch | operator and orchestrator in tmux | 2026-11-12 |
+| Resume check: `pi --session <file>` restores the footer to `architect`, and the agent still answers as the architect | operator and orchestrator in tmux | 2026-11-12 |
+| Session record inspected: the system entry carries the agent body under `preamble` while `project_context`, `skills`, `cwd` and `mcp_servers` are unchanged; five `agent-switch-state` entries, no `custom_message` | orchestrator | 2026-11-12 |
+| Spec set to `active`; the two follow-ups moved to `## Known gaps` | orchestrator | 2026-11-12 |
 | `applyAgentToPromptOptions` takes `AgentDefinition \| null` for `Main`; `loadAgents` gains an optional `options` argument | architect, accepted by orchestrator | 2026-11-12 |
 | The `AGENTS.md` acceptance block is edited by the orchestrator, not the implementer | orchestrator | 2026-11-12 |
 | `Key` is not re-exported by `pi-coding-agent`; the shortcut uses the literal `"ctrl+shift+a"`, so `pi-tui` stays out | architect | 2026-11-12 |

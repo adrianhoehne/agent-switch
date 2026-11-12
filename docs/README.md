@@ -57,7 +57,7 @@ down in [`AGENTS.md`](../AGENTS.md).
 
 | File | Content | Status |
 |---|---|---|
-| [`01-switch-main-agent-prompt.md`](01-switch-main-agent-prompt.md) | Cycles the main agent's system prompt through the agent definition files on `ctrl+shift+a`, keeping project context and history intact | proposed |
+| [`01-switch-main-agent-prompt.md`](01-switch-main-agent-prompt.md) | Cycles the main agent's system prompt through the agent definition files on `ctrl+shift+a`, keeping project context and history intact | active |
 
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.
