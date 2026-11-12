@@ -33,7 +33,7 @@ onto the key.
 
 | File | Change |
 |---|---|
-| `~/.pi/agent/keybindings.json` | **new file**, one line: `"app.thinking.cycle": []` — the empty list is how pi disables an action's bindings |
+| `~/.pi/agent/keybindings.json` | **new file**, content `{ "app.thinking.cycle": [] }` — the empty list is how pi disables an action's bindings |
 | `src/extension.ts` | `SHORTCUT_KEY` becomes `"shift+tab"`; the comment above it explains the release and why the key was chosen |
 | `test/extension.test.ts` | the case `shortcut is registered` asserts `"shift+tab"` instead of `"ctrl+shift+a"` |
 
@@ -92,6 +92,7 @@ The complete list of files this increment touches, and who owns each:
 | `src/extension.ts` | implementer (stage 1) |
 | `test/extension.test.ts` | implementer (stage 1) |
 | `docs/01-switch-main-agent-prompt.md` | orchestrator (stage 4, the amendments) |
+| `docs/README.md` | orchestrator (stage 4: the `01` row names the key) |
 | `~/.pi/agent/keybindings.json` | **orchestrator only (stage 2)** — see below |
 
 - **Not** any other file under `~/.pi/agent/**`, not `~/.agents/**`, not the agent
@@ -147,11 +148,13 @@ with the operator on 2026-11-12.
    documents the shortcut, and the reserved-list sentence, which changes meaning
    because `shift+tab` *is* in that list. `## Log` rows keep the old key — a log is
    history, not documentation.
-   Proof: `grep -rn 'ctrl+shift+a' docs/01-switch-main-agent-prompt.md src/ test/`
-   returns only `## Log` lines; `npm run typecheck` and `npm test` stay green.
+   Proof: `grep -rn 'ctrl+shift+a' docs/01-switch-main-agent-prompt.md docs/README.md src/ test/`
+   returns exactly three kinds of hit: `01`'s `## Review` and `## Log` lines (history),
+   and `docs/README.md`'s `03` row, which names the old key as the origin of the move.
+   `npm run typecheck` and `npm test` stay green.
 
-Who runs what: 1 the implementer, 2 and 3 the orchestrator as part of acceptance,
-4 the orchestrator, the live criteria the operator.
+Who runs what: stage 1 the implementer; stages 2 and 4 the orchestrator, together with
+criterion 3 as acceptance evidence; stage 3 and criteria 4-6 the operator.
 
 ### What could go wrong
 
@@ -174,7 +177,7 @@ Who runs what: 1 the implementer, 2 and 3 the orchestrator as part of acceptance
 Stage 1 has no prerequisite. Stage 2 has no dependency on stage 1 but must be finished
 before stage 3 and before the commit, because criterion 3 is acceptance evidence.
 Criterion 4 is the gate that proves the two halves fit; if it fails, the fault is in
-stage 2 first, not in the constant. Sequence: 1 → 2 → 3 → review → commit.
+stage 2 first, not in the constant. Sequence: 1 → 2 → 3 → 4 → review → commit.
 
 ### What the next increment inherits
 
@@ -206,13 +209,15 @@ that name the old key:
 |---|---|
 | frontmatter `description`, `## Goal`, `## Behaviour` table | `ctrl+shift+a` → `shift+tab` |
 | criterion 9, `## Testing` row for `shortcut is registered` | the literal and its expectation |
-| `## Risks` shortcut bullet, the `Key`-not-exported paragraphs, stage 4 of `## Dev plan`, `## Log` | the literal in the rationale |
+| `## Risks` shortcut bullet, the `Key`-not-exported paragraphs, stage 4 of `## Dev plan` | the literal in the rationale. `## Log` is history and keeps it |
+| `docs/README.md`, the `01` row | the key in the registry description |
 | **`## Risks`, the sentence "`ctrl+shift+a` is in neither list"** | **changes meaning, not just wording**: `shift+tab` *is* in the reserved list, so the sentence must now say that the key is owned by `app.thinking.cycle` and released in `keybindings.json` |
 
-The `## Log` rows keep the old key where they record history; a log is not
-retroactively edited. Proof after the amendment: `grep -rn 'ctrl+shift+a'
-docs/01-switch-main-agent-prompt.md src/ test/` returns only `## Log` lines. This
-section is removed at step 7, when 01 is amended.
+The `## Review` and `## Log` sections keep the old key where they record history; a log
+is not retroactively edited. Proof after the amendment: `grep -rn 'ctrl+shift+a'
+docs/01-switch-main-agent-prompt.md docs/README.md src/ test/` returns only `01`'s
+`## Review` and `## Log` lines plus `docs/README.md`'s `03` row, which names the old key
+as the origin of the move. This section is removed at step 7, when 01 is amended.
 
 ## Review
 
@@ -245,6 +250,45 @@ itself.
 
 Round 1 outcome: block and all notes applied.
 
+**2026-11-12 — spec review, round 2 — 🔧 Fix these and I'll sign off — blockers: none.**
+
+The round-1 blocker is closed: the amendments section names the reserved-list sentence
+as a meaning change, stage 4 carries it, the touch boundary is a per-file owner table
+with the global file walled off, `## Log` records the operator's agreement, and
+`keybindings.json` really does not exist yet. Verified: `npm test` prints
+`Tests  35 passed (35)`, `app.thinking.cycle` is the only `shift+tab` binding, pi's
+exports map is `.` and `./rpc-entry`.
+
+Notes: stage 4's proof could not pass — `01`'s `## Review` also keeps the old key, and
+`docs/README.md`'s `01` row was outside the grep; the sequence line skipped stage 4;
+`## Files and interfaces` quoted the keybindings file as a fragment where stage 2 has
+an object.
+
+Round 2 outcome: all applied.
+
+**2026-11-12 — spec review, round 3 — 🔧 Fix these — blockers: none.**
+
+The amended proof was still one item short, same trap as round 2: `docs/README.md:62`
+is `03`'s own row and names the old key as the origin of the move, so "only Review and
+Log lines" stayed unsatisfiable. The 01 side was correct: after the amendment only
+462 (`## Review`) and 483/517 (`## Log`) remain, and every other hit sits in a section
+the table names. Also: "who runs what" said stage 3 was the orchestrator's although
+stage 3 is the operator's; round 2's verdict was missing from `## Review`.
+
+Round 3 outcome: all three applied.
+
+**2026-11-12 — spec review, round 4 — ✅ Ship it — blockers: no.**
+
+Verified the round-3 fixes by running the proof: today 17 hits, stage 1 removes two,
+stage 4 removes thirteen, leaving exactly `01`'s 462 (`## Review`), 483 and 517
+(`## Log`) plus `docs/README.md:62`, which names the old key as the origin. Satisfiable
+and stated to the line. Owners agree across stages, touch boundary, amendments table
+and proofs; criteria 1-6 unregressed; the sequence no longer skips a stage. Follow-up,
+applied: the amendments table no longer lists `## Log` among the spots to rewrite, and
+round 3 is recorded.
+
+Gate: open.
+
 ## Log
 
 | Decision | Source | Date |
@@ -253,3 +297,4 @@ Round 1 outcome: block and all notes applied.
 | The operator agreed that this increment creates `~/.pi/agent/keybindings.json` — a global file outside the repository | operator | 2026-11-12 |
 | Spec review round 1 blocker: `docs/01` documents the old key and is amended in place, with the reserved-list sentence called out as a meaning change | spec review round 1 | 2026-11-12 |
 | Round-1 notes: criterion 2 names the grep for the literal, criterion 6 names the always-available status line, the touch boundary lists owner per file, the picker risk was factually wrong and is replaced, `/hotkeys` empty cell added to Known gaps, the "no new test case" reason now cites pi's exports map | spec review round 1 | 2026-11-12 |
+| Round-2 notes: the amendment proof excludes neither `## Review` nor `docs/README.md` (both keep the old key as history or as a registry row to update), sequence line includes stage 4, the keybindings content is quoted as an object | spec review round 2 | 2026-11-12 |
