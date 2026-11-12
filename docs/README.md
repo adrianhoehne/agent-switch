@@ -58,6 +58,7 @@ down in [`AGENTS.md`](../AGENTS.md).
 | File | Content | Status |
 |---|---|---|
 | [`01-switch-main-agent-prompt.md`](01-switch-main-agent-prompt.md) | Cycles the main agent's system prompt through the agent definition files on `ctrl+shift+a`, keeping project context and history intact | active |
+| [`02-tests-close-the-gaps.md`](02-tests-close-the-gaps.md) | Closes three test gaps of 01 and stops the shortcut recording a selection before the cycle exists | proposed |
 
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.
