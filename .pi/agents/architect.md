@@ -8,13 +8,14 @@
 # Kind ohne Schreibwerkzeuge kann keinen Produktcode anfassen. Nebeneffekt fuer die
 # Prompt-Verarbeitung: weniger Tool-Definitionen = kleinerer Child-Prompt.
 #
-# `prompt_mode: replace` ist Absicht: fuer eine Spec-Aufgabe ist Pi's Basis-Prompt
-# nicht noetig, und der Body ist selbst vollstaendig. Folge, die man kennen muss:
-# `replace` heisst in tintinwebs Loader „kein AGENTS.md-Erbe". Die Repo-Regeln kommen
-# deshalb ueber die Anweisung im Body — der Architekt liest `AGENTS.md` und
-# `docs/README.md` mit seinem `read`-Tool, bevor er plant. Wer das Erbe stattdessen
-# im Prompt will, setzt `prompt_mode: append`; dann steht der Body hinter Pis Prompt.
+# `prompt_mode: append` ist Absicht: der Architekt wird fast immer aus der
+# Main-Session heraus gestartet. `append` heisst in tintinwebs Loader: der
+# Systemprompt des Parents wird woertlich vorangestellt (inkl. `AGENTS.md`,
+# Projektkontext und Pis Basis-Prompt), dahinter die Bridge und dieser Body als
+# `<agent_instructions>`. Er muss die Regeln also nicht erst lesen. Weil sein Parent
+# die Main-Session ohne Agent-Body ist, schleicht sich kein fremder Rollentext ein.
 # `skills: false` haelt den Skills-Katalog draussen, er kostet nur Prompt-Platz.
+# `inherit_context: false` (Default) heisst: kein Gespraechsverlauf, nur der Task.
 #
 # `bash` ist dabei, aber nur fuer Lesekommandos (git log/show/diff/status, head/tail,
 # grep) — "read-only bash" laesst sich nicht als Tool-Grenze ausdruecken, das ist
@@ -32,7 +33,7 @@
 # Projektblock an.
 name: architect
 description: Software architect - writes the dev plan for an increment (step order, files, risks, proof per step) into the spec the caller wrote, or, when no spec exists yet, the spec itself in the project's spec format; returns only the document
-prompt_mode: replace
+prompt_mode: append
 thinking: high
 tools: read, grep, find, ls, bash
 skills: false
