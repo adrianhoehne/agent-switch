@@ -15,11 +15,24 @@ import {
 } from "./state";
 
 /**
- * Literal key id, not `Key.ctrlShift("a")`: `Key` lives in `@earendil-works/pi-tui`
- * and is not re-exported by `@earendil-works/pi-coding-agent`, so building the id
- * would add a direct dependency for a string pi matches verbatim anyway.
+ * `shift+tab`, because it arrives as `ESC[Z` on every terminal and stays
+ * distinguishable even where the shift modifier is not reported separately — that
+ * gap is what made a `ctrl+shift+…` id unreliable (plain xterm, tmux with
+ * `extended-keys off`, most macOS terminals).
+ *
+ * The key is not free: pi's built-in `app.thinking.cycle` owns it, and pi drops an
+ * extension shortcut that collides with a reserved built-in, so
+ * `<agent-dir>/keybindings.json` must carry `{ "app.thinking.cycle": [] }` — the
+ * empty list is how pi disables an action's bindings. The trade is accepted:
+ * `/thinking [level]` still sets the level. There is deliberately no fallback key,
+ * so without that file the extension has no shortcut at all.
+ *
+ * Literal key id, not one built with `Key`: `Key` lives in
+ * `@earendil-works/pi-tui` and is not re-exported by
+ * `@earendil-works/pi-coding-agent`, so building the id would add a direct
+ * dependency for a string pi matches verbatim anyway.
  */
-const SHORTCUT_KEY = "ctrl+shift+a";
+const SHORTCUT_KEY = "shift+tab";
 
 /** Footer status slot. One segment next to pi's own; no custom footer. */
 const STATUS_KEY = "agent";

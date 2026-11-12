@@ -265,7 +265,7 @@ it("shortcut is registered", () => {
 
   // THEN exactly one shortcut exists, on the literal key pi matches verbatim,
   expect(stub.shortcuts).toHaveLength(1);
-  expect(stub.shortcuts[0].key).toBe("ctrl+shift+a");
+  expect(stub.shortcuts[0].key).toBe("shift+tab");
   expect(stub.shortcuts[0].description).toBeTruthy();
 });
 

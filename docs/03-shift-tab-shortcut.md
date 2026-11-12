@@ -1,9 +1,12 @@
 ---
 description: Moves the agent cycle from ctrl+shift+a to shift+tab and releases that key from pi's thinking cycle, so the shortcut works on every terminal instead of only those that report the shift modifier.
-status: proposed
+status: active
 ---
 
 # 03 — Move the cycle to shift+tab
+
+Implemented on 2026-11-12. Criteria 1-4 are verified; 5 and 6 are the operator's
+live check in a real terminal.
 
 ## Goal
 
@@ -198,27 +201,6 @@ stage 2 first, not in the constant. Sequence: 1 → 2 → 3 → 4 → review →
 | `app.thinking.cycle` stays unbound for every project on this machine | the release is global by nature; `/thinking [level]` is the remaining entry point, and rebinding the key per project is not something pi supports |
 | `/hotkeys` renders an empty key cell for "Cycle thinking level" | with the action unbound, the row keeps its label and loses its key. Cosmetic; no action |
 
-## Amendments to previous spec docs
-
-This increment changes a key that `docs/01-switch-main-agent-prompt.md` documents. It
-is amended in place in the same increment — the route that `docs/README.md` prescribes
-for a changed behaviour, and the one increment 02 already took (`8491005`). The places
-that name the old key:
-
-| `docs/01` location | Change |
-|---|---|
-| frontmatter `description`, `## Goal`, `## Behaviour` table | `ctrl+shift+a` → `shift+tab` |
-| criterion 9, `## Testing` row for `shortcut is registered` | the literal and its expectation |
-| `## Risks` shortcut bullet, the `Key`-not-exported paragraphs, stage 4 of `## Dev plan` | the literal in the rationale. `## Log` is history and keeps it |
-| `docs/README.md`, the `01` row | the key in the registry description |
-| **`## Risks`, the sentence "`ctrl+shift+a` is in neither list"** | **changes meaning, not just wording**: `shift+tab` *is* in the reserved list, so the sentence must now say that the key is owned by `app.thinking.cycle` and released in `keybindings.json` |
-
-The `## Review` and `## Log` sections keep the old key where they record history; a log
-is not retroactively edited. Proof after the amendment: `grep -rn 'ctrl+shift+a'
-docs/01-switch-main-agent-prompt.md docs/README.md src/ test/` returns only `01`'s
-`## Review` and `## Log` lines plus `docs/README.md`'s `03` row, which names the old key
-as the origin of the move. This section is removed at step 7, when 01 is amended.
-
 ## Review
 
 **2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (1).**
@@ -298,3 +280,8 @@ Gate: open.
 | Spec review round 1 blocker: `docs/01` documents the old key and is amended in place, with the reserved-list sentence called out as a meaning change | spec review round 1 | 2026-11-12 |
 | Round-1 notes: criterion 2 names the grep for the literal, criterion 6 names the always-available status line, the touch boundary lists owner per file, the picker risk was factually wrong and is replaced, `/hotkeys` empty cell added to Known gaps, the "no new test case" reason now cites pi's exports map | spec review round 1 | 2026-11-12 |
 | Round-2 notes: the amendment proof excludes neither `## Review` nor `docs/README.md` (both keep the old key as history or as a registry row to update), sequence line includes stage 4, the keybindings content is quoted as an object | spec review round 2 | 2026-11-12 |
+| Stage 2 done by the orchestrator: `~/.pi/agent/keybindings.json` created with `{ "app.thinking.cycle": [] }`; `node -e` prints it | orchestrator | 2026-11-12 |
+| Stage 1: constant and test literal moved, comment explains the reserved key | code review, `✅` | 2026-11-12 |
+| Stage 4: `docs/01` amended at ten places plus the registry row; the proof returns only `## Review`/`## Log` lines and `03`'s own registry row | orchestrator | 2026-11-12 |
+| Live, `pi --extension ./src/extension.ts`: `shift+tab` cycles `Main` → `architect` → `grizzled-senior-dev`; `/hotkeys` lists `Shift+Tab` under Extensions; no conflict diagnostic | orchestrator in tmux | 2026-11-12 |
+| Amendments section removed, spec set to `active` | orchestrator | 2026-11-12 |

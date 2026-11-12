@@ -1,5 +1,5 @@
 ---
-description: Cycles the main agent's system prompt through the agent definition files on ctrl+shift+a, effective on the next message, keeping project context and conversation history intact.
+description: Cycles the main agent's system prompt through the agent definition files on shift+tab, effective on the next message, keeping project context and conversation history intact.
 status: active
 ---
 
@@ -11,7 +11,7 @@ session check is recorded in `## Log`.
 ## Goal
 
 The main agent of a pi session changes the system prompt it answers with, without
-restarting the session. `ctrl+shift+a` cycles through `Main` — pi's own prompt — and
+restarting the session. `shift+tab` cycles through `Main` — pi's own prompt — and
 the agent definitions found on the machine; the footer names the active one. From
 the next message on, the request carries that agent's prompt body as its role
 prompt. Project context (this file, the skill catalogue, the working directory)
@@ -21,7 +21,7 @@ stays in the request, and the conversation is never rewritten.
 
 | Point | Decision |
 |---|---|
-| Trigger | `ctrl+shift+a` cycles forward, wrapping. No picker dialog. |
+| Trigger | `shift+tab` cycles forward, wrapping. No picker dialog. |
 | Cycle list | `Main` first, then all loaded agents sorted case-insensitively by name, `enabled: false` skipped |
 | Footer | `ctx.ui.setStatus("agent", …)` shows `Main` or the agent name. The working row stays pi's own (`⠋ Working…`). |
 | Prompt swap | `prompt_mode: replace` sets `systemPromptOptions.customPrompt`; `append` sets `appendSystemPrompt`. Both leave `project_context`, `skills`, `cwd`, `selectedTools` and extension sections untouched. |
@@ -126,7 +126,7 @@ Rules fixed here:
 | 6 | Cycle order is `Main`, then agents sorted case-insensitively by name, wrapping | cases `cycle starts at Main`, `cycle sorts agents by name`, `cycle wraps to Main` |
 | 7 | `enabled: false` agents are not in the cycle | case `disabled agent is skipped` |
 | 8 | Discovery is name-keyed: a project agent replaces a global one of the same name, one entry remains | cases `project agent overrides global`, `duplicate name: later tier wins` |
-| 9 | The shortcut is registered on `ctrl+shift+a` | case `shortcut is registered` |
+| 9 | The shortcut is registered on `shift+tab` | case `shortcut is registered` |
 | 10 | After a cycle the footer status carries `Main` or the agent name | case `footer shows the current name` |
 | 11 | The choice is written as a `custom` entry with `customType: "agent-switch-state"` and restored on `session_start` | cases `selection is persisted`, `restore last selection` |
 | 12 | A selection whose agent file disappeared falls back to `Main` with a warning | case `missing agent falls back to Main` |
@@ -162,7 +162,7 @@ call still works" is part of the manual check.
 | | `cycle sorts agents by name` | the sort half of criterion 6 |
 | | `cycle uses agent names` | the label is the agent name, not the path |
 | | `unknown label resolves to Main` | a stale label cannot freeze the cycle |
-| `test/extension.test.ts` | `shortcut is registered` | exactly `ctrl+shift+a` |
+| `test/extension.test.ts` | `shortcut is registered` | exactly `shift+tab` |
 | | `before_agent_start applies the current agent` | the registered handler really reaches `applyAgentToPromptOptions` |
 | | `footer shows the current name` | `setStatus` receives `Main` or the name |
 | | `selection is persisted` | the entry carries `customType: "agent-switch-state"` |
@@ -193,9 +193,12 @@ call still works" is part of the manual check.
 - **Rejected alternative: deep-importing `@tintinweb/pi-subagents/dist/custom-agents.js`.**
   That package has no `exports` field; the import would break on any internal
   rename. `parseFrontmatter` comes from `@earendil-works/pi-coding-agent`.
-- **Shortcut conflicts.** pi refuses extension shortcuts that collide with
-  reserved built-ins and warns on the others. `ctrl+shift+a` is in neither list
-  today; that is re-checked at load time, because `pi-subagents` may claim it later.
+- **Shortcut conflicts.** pi refuses extension shortcuts that collide with a
+  reserved built-in and warns on the others. `shift+tab` is such a key:
+  `app.thinking.cycle` owns it, so the registration is only kept when
+  `<agent-dir>/keybindings.json` releases it with `{ "app.thinking.cycle": [] }`
+  (`docs/03-shift-tab-shortcut.md`). Without that file the extension has no shortcut
+  and pi reports the conflict in its `[Extension issues]` block.
 - **Agent bodies are repo-controlled text that becomes the system prompt.**
   `.pi/agents/*.md` is not behind pi's project-trust gate (that gate lists
   `settings.json`, `mcp.json`, `extensions`, `skills`, `prompts`, `themes` and
@@ -223,7 +226,7 @@ call still works" is part of the manual check.
 | `@types/node` | 22.20.5 | MIT | `fs` and `path` types |
 
 `pi-tui` is not needed as a direct dependency: the shortcut is registered with the
-literal key id `"ctrl+shift+a"`, not with `Key.ctrlShift("a")` — `Key` lives in
+literal key id, not with a `Key` helper — `Key` lives in
 `pi-tui` and is not re-exported by `@earendil-works/pi-coding-agent`. Its types are
 still resolved transitively, because `KeyId` in pi's type declarations is imported
 from `@earendil-works/pi-tui`; that works as long as `pi-coding-agent` is
@@ -331,7 +334,7 @@ edited by hand — `## Touch boundary`). No stage depends on a later one.
    rebuild `cycle`, restore via
    `lastSelectedLabel(ctx.sessionManager.getEntries())`, fall back to `Main` +
    `ctx.ui.notify(…, "warning")` when `findEntry` misses;
-   `pi.registerShortcut("ctrl+shift+a", { description, handler })` (literal string
+   `pi.registerShortcut("shift+tab", { description, handler })` (literal string
    — `KeyId` is a template-literal union, `Key.ctrlShift("a")` from
    `@earendil-works/pi-tui`, which `@earendil-works/pi-coding-agent` does not
    re-export) → `nextLabel`, `pi.appendEntry(STATE_CUSTOM_TYPE, { name: currentLabel })`,
@@ -361,7 +364,7 @@ edited by hand — `## Touch boundary`). No stage depends on a later one.
   Everything else in the table is a vitest case or an exit code.
 - **`Key` is not exported by `@earendil-works/pi-coding-agent`**
   (`dist/index.d.ts` has no `Key`; `examples/extensions/preset.ts:46` imports it
-  from `@earendil-works/pi-tui`). Registering the literal `"ctrl+shift+a"` keeps
+  from `@earendil-works/pi-tui`). Registering the literal key id keeps
   the dependency table right.
 - **Runtime import weight in tests.**
   `import { parseFrontmatter } from "@earendil-works/pi-coding-agent"` resolves to
@@ -378,9 +381,11 @@ edited by hand — `## Touch boundary`). No stage depends on a later one.
   `preset.ts` pattern); `docs/extensions.md` → "State" advises `getBranch()` for
   branch-sensitive data. On a branched session the label can come from an abandoned
   branch. Recorded, not fixed here.
-- **Shortcut collision.** `ctrl+shift+a` is free in pi 1.3.0's defaults
-  (`docs/keybindings.md` names `ctrl+shift+n/t/f/g/up/down`); pi prints a collision
-  warning at load. Only the criterion-13 run proves it today.
+- **Shortcut collision.** `shift+tab` is owned by `app.thinking.cycle` in pi
+  1.3.0's defaults, which is why this project releases it in
+  `<agent-dir>/keybindings.json`. On a machine without that file pi drops the
+  registration and says so in the `[Extension issues]` block; only a live run proves
+  the key works.
 
 ### Ordering and dependencies
 
@@ -512,6 +517,7 @@ Gate: open.
 | Resume check: `pi --session <file>` restores the footer to `architect`, and the agent still answers as the architect | operator and orchestrator in tmux | 2026-11-12 |
 | Session record inspected: the system entry carries the agent body under `preamble` while `project_context`, `skills`, `cwd` and `mcp_servers` are unchanged; five `agent-switch-state` entries, no `custom_message` | orchestrator | 2026-11-12 |
 | Spec set to `active`; the two follow-ups moved to `## Known gaps` | orchestrator | 2026-11-12 |
+| Shortcut moved to `shift+tab` by `docs/03-shift-tab-shortcut.md`; the reserved-list sentence now names `app.thinking.cycle` and the keybindings release | docs/03, spec review round 1 | 2026-11-12 |
 | `applyAgentToPromptOptions` takes `AgentDefinition \| null` for `Main`; `loadAgents` gains an optional `options` argument | architect, accepted by orchestrator | 2026-11-12 |
 | The `AGENTS.md` acceptance block is edited by the orchestrator, not the implementer | orchestrator | 2026-11-12 |
 | `Key` is not re-exported by `pi-coding-agent`; the shortcut uses the literal `"ctrl+shift+a"`, so `pi-tui` stays out | architect | 2026-11-12 |
