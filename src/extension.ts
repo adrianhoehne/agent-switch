@@ -213,7 +213,7 @@ export default function agentSwitch(pi: ExtensionAPI): void {
 
   // Assigning a freshly built list rather than appending: `session_start` fires
   // again on resume and reload, and a second load must not double the cycle.
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", async (_event, ctx) => {
     cycle = loadCycle(ctx);
     const restored = restoreSelection(cycle, ctx.sessionManager.getEntries());
     currentLabel = restored.label;
@@ -224,6 +224,19 @@ export default function agentSwitch(pi: ExtensionAPI): void {
       );
     }
     setLabel(ctx);
+
+    // The one place this extension applies a selection without a keypress: a resumed
+    // session must continue on the agent it left off on, not merely show its name in
+    // the footer. The failure rule is the keypress's: whatever cannot be applied is
+    // warned about and the current model stays.
+    //
+    // This handler can never capture the snapshot, because it contains no capture
+    // statement. It must not gain one: pi persists the session model in the
+    // transcript, so `ctx.model` is already the resumed agent's model here, and a
+    // snapshot taken now would record that as the session's starting state.
+    if (currentLabel !== MAIN_LABEL) {
+      await applySelection(selectedAgent(), selectionDeps(ctx));
+    }
   });
 
   pi.registerShortcut(SHORTCUT_KEY, {

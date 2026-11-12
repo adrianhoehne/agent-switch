@@ -1,9 +1,12 @@
 ---
 description: Adopts the optional model and thinking level of an agent definition when the cycle selects it, keeping the current values when a field is absent or unusable, and restores the session's starting state on Main.
-status: proposed
+status: active
 ---
 
 # 04 — Optional model and thinking from the agent file
+
+Implemented on 2026-11-12. Criteria 1-11 are verified; criterion 12 is the operator's
+live check.
 
 ## Goal
 
@@ -326,29 +329,6 @@ Recorded 2026-11-12. Each is a limit of this increment, not a defect.
 | `thinking` is not checked against the chosen model | pi clamps an unsupported level and the footer shows the effective value; warning about a clamp is not part of this increment |
 | A resume re-applies the model even when it is already current | `pi.setModel` appends a `model_change` entry, so every resume writes one. `SelectionDeps` has no `currentModel`/`currentThinking`, so a no-op skip is not possible without widening the interface |
 
-## Amendments to previous spec docs
-
-`docs/01-switch-main-agent-prompt.md` owns the `AgentDefinition` interface and states
-that only the system prompt is swapped. Both change here, so 01 is amended in place in
-the same increment, as 02 and 03 did:
-
-| `docs/01` location | Change |
-|---|---|
-| `## Files and interfaces`, the `AgentDefinition` block | gains `model?: string` and `thinking?: ThinkingLevel` |
-| `## Files and interfaces`, the `src/agents.ts` row | mentions the two parsed fields |
-| `## Non-goals`, the first bullet ("Not adopting `model`, `thinking` or `tools`") | narrowed to `tools`; the other two are adopted by this increment |
-| `## Known gaps`, the row about `model`/`thinking`/`tools` | reduced to `tools` |
-| `## Log` | keeps its rows; the follow-up is history |
-| `### What the next increment inherits` | the bullet naming `model`/`thinking` adoption as a later increment is now shipped |
-| frontmatter `description` and `## Goal` | **stay as they are**: 01's subject is still the prompt swap; model and thinking are additive and are documented here |
-| `docs/03-shift-tab-shortcut.md`, `## Non-goals` | "No change to how thinking levels are set … beyond releasing the key" stops holding the moment this ships |
-
-Proof after the amendment: `grep -n 'of the agent file are not adopted\|Not\*\* adopting' docs/01-switch-main-agent-prompt.md`
-prints nothing, and `grep -n 'beyond releasing the key' docs/03-shift-tab-shortcut.md` prints
-nothing. A grep on `model.*thinking` would also match the rewritten `src/agents.ts` row, so
-it cannot decide the amendment. This section is
-removed at step 7, when 01 is amended.
-
 ## Review
 
 **2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (5).**
@@ -424,3 +404,6 @@ Gate: open.
 | Totals corrected to 54 cases (19 new): stage 2 carries ten, not nine, because the empty-reference case was added after the review | stage 3 report | 2026-11-12 |
 | `press before session_start is a no-op` asserts `resolves.toBeUndefined()` instead of `not.toThrow()` — the old form goes vacuous for an async handler; same intent | stage 3 report, for review | 2026-11-12 |
 | Stage 3 committed: one capture site in the handler, idle guard before any mutation, `restoreMain` skips a missing model and warns on refusal or throw; `before_agent_start` untouched. The assertion rewrite was judged justified; the `apply.ts` message nit and the 54 correction were authorised orchestrator work | code review, `✅` | 2026-11-12 |
+| Stage 4 committed: `session_start` re-applies a resumed selection; the stub records one interleaved log, so `restoreMain`'s model-before-level order is pinned; the capture site stayed single | code review, `✅` | 2026-11-12 |
+| `docs/01` and `docs/03` amended in place; both amendment proofs return no hits | orchestrator | 2026-11-12 |
+| Amendments section removed, spec set to `active` | orchestrator | 2026-11-12 |

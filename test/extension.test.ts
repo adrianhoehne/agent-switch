@@ -165,10 +165,16 @@ interface StubApi {
   readonly entries: RecordedEntry[];
   /** The state `setModel` and `getThinkingLevel` read and write. */
   readonly session: StubSession;
-  /** Every `setModel` call as `provider/id`, refused and thrown ones included. */
-  readonly modelCalls: string[];
-  /** Every `setThinkingLevel` call, in order. */
-  readonly thinkingLevelCalls: ThinkingLevel[];
+  /**
+   * Every intercepted setter call, in the order it happened, as `setter value`:
+   * `setModel anthropic/claude-sonnet-4`, `setThinkingLevel high`.
+   *
+   * One interleaved log rather than one array per setter: the model is set before
+   * the level (pi clamps the level against the model), and two arrays can only show
+   * that each setter ran, never in which order. Refused and thrown `setModel` calls
+   * are logged too — the attempt is the evidence.
+   */
+  readonly calls: string[];
 }
 
 /**
@@ -183,8 +189,7 @@ function createStubApi(options: StubApiOptions = {}): StubApi {
   const handlers = new Map<string, RecordedHandler>();
   const shortcuts: RecordedShortcut[] = [];
   const entries: RecordedEntry[] = [];
-  const modelCalls: string[] = [];
-  const thinkingLevelCalls: ThinkingLevel[] = [];
+  const calls: string[] = [];
   const session = options.session ?? createStubSession();
 
   const api = {
@@ -207,7 +212,7 @@ function createStubApi(options: StubApiOptions = {}): StubApi {
       entries.push({ customType, data });
     },
     async setModel(model: StubModel): Promise<boolean> {
-      modelCalls.push(`${model.provider}/${model.id}`);
+      calls.push(`setModel ${model.provider}/${model.id}`);
       if (options.setModelThrows === true) {
         throw new Error("No API key for this model.");
       }
@@ -218,7 +223,7 @@ function createStubApi(options: StubApiOptions = {}): StubApi {
       return true;
     },
     setThinkingLevel(level: ThinkingLevel): void {
-      thinkingLevelCalls.push(level);
+      calls.push(`setThinkingLevel ${level}`);
       session.thinkingLevel = level;
     },
     getThinkingLevel(): ThinkingLevel {
@@ -232,8 +237,7 @@ function createStubApi(options: StubApiOptions = {}): StubApi {
     shortcuts,
     entries,
     session,
-    modelCalls,
-    thinkingLevelCalls,
+    calls,
   };
 }
 
@@ -378,8 +382,17 @@ function requireHandler(stub: StubApi, event: string): RecordedHandler {
   return handler;
 }
 
-function startSession(stub: StubApi, context: StubContext): void {
-  requireHandler(stub, "session_start")({ type: "session_start", reason: "startup" }, context.context);
+/**
+ * Returns the handler's promise: a resume applies the restored selection before it
+ * resolves, so a case that asserts what the resume changed has to await it.
+ */
+function startSession(stub: StubApi, context: StubContext): Promise<unknown> {
+  return Promise.resolve(
+    requireHandler(stub, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context.context,
+    ),
+  );
 }
 
 function pressShortcut(stub: StubApi, context: StubContext): Promise<void> {
@@ -451,12 +464,12 @@ it("second session_start does not duplicate the cycle", async () => {
   // three presses below prove the whole walk instead of continuing from a label a
   // previous session restored.
   const session = createStubContext({ cwd: fixture.cwd });
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN a third agent appears and the session starts a second time — a resume
   // fires `session_start` again, and the fixture changed in between,
   fixture.writeAgent("mike", REVIEWER_PROMPT);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // AND the shortcut is pressed three times,
   await pressShortcut(stub, session);
@@ -472,7 +485,7 @@ it("second session_start does not duplicate the cycle", async () => {
   expect(stub.entries.map((entry) => entry.data.name)).toEqual(["alpha", "mike", "zulu"]);
 });
 
-it("skipped file surfaces a warning", () => {
+it("skipped file surfaces a warning", async () => {
   // GIVEN an agent file whose frontmatter claims the label the reset position
   // already owns, so `readAgentFile` holds it back instead of loading it,
   const skippedPath = fixture.writeAgent(MAIN_LABEL.toLowerCase(), REVIEWER_PROMPT);
@@ -483,7 +496,7 @@ it("skipped file surfaces a warning", () => {
   const session = createStubContext({ cwd: fixture.cwd });
 
   // WHEN the session starts and discovery runs,
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // THEN exactly one warning reaches the operator, naming the file and the reason,
   // because an agent silently missing from the cycle looks like a broken extension:
@@ -501,7 +514,7 @@ it("before_agent_start applies the current agent", async () => {
   const stub = createStubApi();
   agentSwitch(stub.api);
   const session = createStubContext({ cwd: fixture.cwd });
-  startSession(stub, session);
+  await startSession(stub, session);
   await pressShortcut(stub, session);
 
   // WHEN the next message is about to be composed,
@@ -523,7 +536,7 @@ it("footer shows the current name", async () => {
   const session = createStubContext({ cwd: fixture.cwd });
 
   // WHEN the session starts,
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // THEN the footer segment already names the reset position, under the key the
   // built-in footer renders,
@@ -540,7 +553,7 @@ it("selection is persisted", async () => {
   const stub = createStubApi();
   agentSwitch(stub.api);
   const session = createStubContext({ cwd: fixture.cwd });
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the shortcut selects it,
   await pressShortcut(stub, session);
@@ -550,7 +563,7 @@ it("selection is persisted", async () => {
   expect(stub.entries).toEqual([{ customType: STATE_CUSTOM_TYPE, data: { name: "reviewer" } }]);
 });
 
-it("restore last selection", () => {
+it("restore last selection", async () => {
   // GIVEN a session whose history carries a previously selected agent, and an agent
   // file that still exists,
   fixture.writeAgent("reviewer", REVIEWER_PROMPT);
@@ -562,14 +575,14 @@ it("restore last selection", () => {
   });
 
   // WHEN the session starts,
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // THEN the footer returns to that agent rather than to `Main`, without a warning:
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "reviewer" });
   expect(session.notifications).toEqual([]);
 });
 
-it("missing agent falls back to Main", () => {
+it("missing agent falls back to Main", async () => {
   // GIVEN a session that selected an agent whose file is gone,
   const stub = createStubApi();
   agentSwitch(stub.api);
@@ -579,8 +592,9 @@ it("missing agent falls back to Main", () => {
   });
 
   // WHEN the session starts,
-  // THEN the resume survives,
-  expect(() => startSession(stub, session)).not.toThrow();
+  // THEN the resume survives — and does not reject, now that the handler is async:
+  // the non-promise form of this assertion would go vacuous the moment it returns one
+  await expect(startSession(stub, session)).resolves.toBeUndefined();
 
   // AND the footer names the reset position while a warning says what disappeared:
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
@@ -597,15 +611,14 @@ it("cycle applies the agent's model and level", async () => {
   });
   const { stub, session } = createStubPair();
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the shortcut selects it,
   await pressShortcut(stub, session);
 
   // THEN the handler wires the decision half: the model goes first, then the level
   // pi clamps against that model — and the footer already names the new agent:
-  expect(stub.modelCalls).toEqual(["anthropic/claude-sonnet-4"]);
-  expect(stub.thinkingLevelCalls).toEqual(["high"]);
+  expect(stub.calls).toEqual(["setModel anthropic/claude-sonnet-4", "setThinkingLevel high"]);
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "architect" });
 });
 
@@ -618,7 +631,7 @@ it("Main restores the snapshot", async () => {
   });
   const { stub, session } = createStubPair();
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the cycle leaves `Main` and comes back to it,
   await pressShortcut(stub, session);
@@ -627,8 +640,14 @@ it("Main restores the snapshot", async () => {
   // THEN `Main` puts the starting model and level back: they were captured before
   // the agent's values were applied, which is why the starting model is second and
   // not first:
-  expect(stub.modelCalls).toEqual(["anthropic/claude-sonnet-4", "anthropic/claude-opus-4"]);
-  expect(stub.thinkingLevelCalls).toEqual(["high", "low"]);
+  // The interleaved log is what proves the order inside the restore itself: model
+  // before level, on the way out and on the way back.
+  expect(stub.calls).toEqual([
+    "setModel anthropic/claude-sonnet-4",
+    "setThinkingLevel high",
+    "setModel anthropic/claude-opus-4",
+    "setThinkingLevel low",
+  ]);
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
   expect(session.notifications).toEqual([]);
 });
@@ -643,7 +662,7 @@ it("agents do not re-snapshot", async () => {
   fixture.writeAgent("zulu", REVIEWER_PROMPT, { model: "acme/zulu-1", thinking: "max" });
   const { stub, session } = createStubPair();
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the cycle walks `Main, alpha, zulu` and then back to `Main`,
   await pressShortcut(stub, session);
@@ -654,12 +673,14 @@ it("agents do not re-snapshot", async () => {
   // `alpha` left behind: moving between two agents does not move the target
   // `Main` returns to. A fixture with a fixed model could not show this, which is
   // why the stubs share a mutable session state.
-  expect(stub.modelCalls).toEqual([
-    "anthropic/claude-sonnet-4",
-    "acme/zulu-1",
-    "anthropic/claude-opus-4",
+  expect(stub.calls).toEqual([
+    "setModel anthropic/claude-sonnet-4",
+    "setThinkingLevel high",
+    "setModel acme/zulu-1",
+    "setThinkingLevel max",
+    "setModel anthropic/claude-opus-4",
+    "setThinkingLevel low",
   ]);
-  expect(stub.thinkingLevelCalls).toEqual(["high", "max", "low"]);
 });
 
 it("press while streaming changes nothing", async () => {
@@ -670,7 +691,7 @@ it("press while streaming changes nothing", async () => {
   });
   const { stub, session } = createStubPair({ idle: false });
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the shortcut is pressed mid-run,
   await pressShortcut(stub, session);
@@ -681,8 +702,7 @@ it("press while streaming changes nothing", async () => {
   // two different models:
   expect(stub.entries).toEqual([]);
   expect(session.statuses).toEqual([{ key: "agent", text: MAIN_LABEL }]);
-  expect(stub.modelCalls).toEqual([]);
-  expect(stub.thinkingLevelCalls).toEqual([]);
+  expect(stub.calls).toEqual([]);
   expect(session.notifications).toEqual([
     {
       message: "A response is still streaming — the agent is switched once it is idle.",
@@ -698,7 +718,7 @@ it("Main restore that throws warns instead of crashing", async () => {
   fixture.writeAgent("plain", REVIEWER_PROMPT);
   const { stub, session } = createStubPair({ setModelThrows: true });
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the cycle leaves `Main` — no `setModel` on that press, so the throw below
   // belongs to the restore alone — and comes back to it,
@@ -714,7 +734,10 @@ it("Main restore that throws warns instead of crashing", async () => {
     type: "warning",
     message: expect.stringContaining("anthropic/claude-opus-4"),
   });
-  expect(stub.thinkingLevelCalls).toEqual(["low"]);
+  expect(stub.calls).toEqual([
+    "setModel anthropic/claude-opus-4",
+    "setThinkingLevel low",
+  ]);
 });
 
 it("snapshot without a model still restores the level", async () => {
@@ -723,7 +746,7 @@ it("snapshot without a model still restores the level", async () => {
   fixture.writeAgent("architect", REVIEWER_PROMPT, { thinking: "high" });
   const { stub, session } = createStubPair({ model: null });
   agentSwitch(stub.api);
-  startSession(stub, session);
+  await startSession(stub, session);
 
   // WHEN the cycle leaves `Main` and comes back to it,
   await pressShortcut(stub, session);
@@ -731,7 +754,41 @@ it("snapshot without a model still restores the level", async () => {
 
   // THEN the restore skips the model silently — there is nothing to put back, and
   // absence is not a failure — and still restores the level:
-  expect(stub.modelCalls).toEqual([]);
-  expect(stub.thinkingLevelCalls).toEqual(["high", "low"]);
+  expect(stub.calls).toEqual(["setThinkingLevel high", "setThinkingLevel low"]);
+  expect(session.notifications).toEqual([]);
+});
+
+it("resume applies the selection again", async () => {
+  // GIVEN a session history that recorded an agent which names a model and a level,
+  // and the agent file that history points at is still there,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  const { stub, session } = createStubPair({ entries: [createStateEntry("architect")] });
+  agentSwitch(stub.api);
+
+  // WHEN the session starts again with that history,
+  await startSession(stub, session);
+
+  // THEN the restored selection is applied, model before level — a resumed label
+  // that only reached the footer would leave the session on the wrong model, and a
+  // level without its model would be clamped against the old one:
+  expect(stub.calls).toEqual([
+    "setModel anthropic/claude-sonnet-4",
+    "setThinkingLevel high",
+  ]);
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "architect" });
+  expect(session.notifications).toEqual([]);
+
+  // AND a later press back to `Main` applies nothing, because a resumed session has
+  // no snapshot — the in-memory limit, pinned here so it cannot regress into a
+  // silent restore of the agent's model:
+  await pressShortcut(stub, session);
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
+  expect(stub.calls).toEqual([
+    "setModel anthropic/claude-sonnet-4",
+    "setThinkingLevel high",
+  ]);
   expect(session.notifications).toEqual([]);
 });

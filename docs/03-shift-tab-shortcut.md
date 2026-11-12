@@ -30,7 +30,8 @@ onto the key.
 - **No** configurable shortcut (CLI flag or settings key). `shift+tab` is the answer
   for this project; configurability can come when a second project needs it.
 - **No** change to how thinking levels are set, displayed or persisted beyond
-  releasing the key.
+  releasing the key. An agent definition may carry a `thinking:` value since
+  `docs/04-agent-model-and-thinking.md`; that increment owns the rule, not this one.
 
 ## Files and interfaces
 

@@ -31,8 +31,9 @@ stays in the request, and the conversation is never rewritten.
 
 ## Non-goals
 
-- **Not** adopting `model`, `thinking` or `tools` from the agent file. The operator
-  asked for the system prompt only; adopting the rest is a separate increment.
+- **No** adoption of `tools` from the agent file. `model` and `thinking` are adopted,
+  per `docs/04-agent-model-and-thinking.md`; tools stay out because a prompt swap keeps
+  tool availability stable, which adopting tools would change mid-conversation.
 - **No** slash command and no picker dialog. One shortcut, one direction.
 - **No** editing or creating agent files.
 - **No** spawning subagents — this changes the prompt of the *main* agent.
@@ -52,7 +53,7 @@ stays in the request, and the conversation is never rewritten.
 | `tsconfig.json` | `strict: true`, Node ESM module settings, `noEmit: true` |
 | `vitest.config.ts` | test include, no globals |
 | `src/extension.ts` | factory: shortcut, `before_agent_start`, `session_start`, footer status |
-| `src/agents.ts` | discovery and parsing over the three directories read in this increment |
+| `src/agents.ts` | discovery and parsing over the three directories read in this increment, including the optional `model` and `thinking` fields |
 | `src/prompt.ts` | `applyAgentToPromptOptions(options, agent)` — pure, mutates only the two named fields |
 | `src/state.ts` | cycle position, the `agent-switch-state` session entry, label formatting |
 | `test/agents.test.ts` | discovery order, filtering, parsing |
@@ -67,6 +68,8 @@ export interface AgentDefinition {
   prompt: string;                     // file body, trimmed
   promptMode: "replace" | "append";   // frontmatter `prompt_mode`, default "replace"
   enabled: boolean;                   // frontmatter `enabled`, default true
+  model?: string;                     // frontmatter `model`, `provider/modelId` or a bare id
+  thinking?: ThinkingLevel;           // frontmatter `thinking`, one of the seven levels
   sourcePath: string;                 // absolute path of the .md file
   source: "project" | "workspace" | "global" | "package";  // "package": declared, not produced here
 }
@@ -251,7 +254,7 @@ increment; each is a follow-up with its reason.
 | `lstatSync` and the later `readFileSync` are not atomic | a file swapped to a symlink between the two calls would still be read; closing it needs `openSync` + `fstat` |
 | The tie case discriminates only under full-ICU Node | a `small-icu` build returns `0` for both comparators and the lock disappears silently |
 | **Package tier not implemented** | the operator decided on 2026-11-12 to defer it: it needs pi's package manifest reader, the project-trust decision and a size ceiling, and no installed package declares an agent today. `source: "package"` and the `packageDirs` seam are in place for it |
-| **`model`, `thinking` and `tools` of the agent file are not adopted** | the operator asked for the system prompt only; opencode ties the model to the agent and switches it along — that is "part 2", a separate spec |
+| **`tools` of the agent file is not adopted** | `model` and `thinking` are, since `docs/04-agent-model-and-thinking.md`; adapting the tool set mid-conversation is a separate decision |
 
 ## Dev plan
 
@@ -412,8 +415,8 @@ the live session to the operator.
   manifest reader (`packageAgentDirs` in `@tintinweb/pi-subagents`), which is not in
   `## Files and interfaces`. The `packageDirs` seam in `loadAgents` is the entry
   point.
-- **Adopting `model`, `thinking`, `tools`** from the agent file, and switch-time
-  model changes — explicitly a separate spec (`## Non-goals`, `## Open questions`).
+- ~~**Adopting `model`, `thinking`, `tools`** from the agent file~~ — `model` and
+  `thinking` shipped in `docs/04-agent-model-and-thinking.md`; `tools` stays out.
 - **Out of scope and untouched:** picker dialog, slash command,
   `display_name`/`color` in the footer, a custom footer, re-reading agent files
   mid-session, `getBranch()`-based restore.
