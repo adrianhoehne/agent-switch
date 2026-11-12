@@ -116,10 +116,13 @@ export default function agentSwitch(pi: ExtensionAPI): void {
   pi.registerShortcut(SHORTCUT_KEY, {
     description: SHORTCUT_DESCRIPTION,
     handler: (ctx) => {
-      // A shortcut can reach the handler before `session_start` has run (a fresh
-      // session, a reload in progress). The cycle is then empty, `nextLabel`
-      // resolves to the reset position and the press is a no-op rather than a
-      // throw — a keyboard handler that crashes pi is worse than one that waits.
+      // An empty cycle means no `session_start` has run yet (a fresh session, a
+      // reload in progress): there is no stop to advance to, so the press does
+      // nothing — no entry for a selection nobody made, no footer write naming a
+      // stop that does not exist, and no throw into pi mid-keypress.
+      if (cycle.length === 0) {
+        return;
+      }
       currentLabel = nextLabel(cycle, currentLabel);
       pi.appendEntry(STATE_CUSTOM_TYPE, { name: currentLabel });
       setLabel(ctx);

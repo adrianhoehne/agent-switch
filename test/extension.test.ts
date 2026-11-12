@@ -93,7 +93,7 @@ interface RecordedShortcut {
 
 interface RecordedEntry {
   readonly customType: string;
-  readonly data: unknown;
+  readonly data: { name: string };
 }
 
 interface StubApi {
@@ -131,7 +131,7 @@ function createStubApi(): StubApi {
     ): void {
       shortcuts.push({ key, description: options.description, handler: options.handler });
     },
-    appendEntry(customType: string, data?: unknown): void {
+    appendEntry(customType: string, data: { name: string }): void {
       entries.push({ customType, data });
     },
   };
@@ -267,13 +267,24 @@ it("shortcut is registered", () => {
   expect(stub.shortcuts).toHaveLength(1);
   expect(stub.shortcuts[0].key).toBe("ctrl+shift+a");
   expect(stub.shortcuts[0].description).toBeTruthy();
+});
 
-  // AND pressing it before `session_start` has built a cycle stays on the reset
-  // position instead of throwing: a keyboard handler that crashes pi mid-keypress
-  // is worse than one that waits for the session to arrive.
+it("press before session_start is a no-op", () => {
+  // GIVEN the extension wired against a stub API whose session has not started, so
+  // no cycle has been built yet,
+  const stub = createStubApi();
+  agentSwitch(stub.api);
   const session = createStubContext({ cwd: fixture.cwd });
+
+  // WHEN the shortcut is pressed,
+  // THEN it does not throw: a keyboard handler that crashes pi mid-keypress is
+  // worse than one that waits for the session to arrive,
   expect(() => pressShortcut(stub, session)).not.toThrow();
-  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
+
+  // AND it leaves no trace — no entry recording a selection nobody made, and no
+  // footer text naming a stop that does not exist:
+  expect(stub.entries).toEqual([]);
+  expect(session.statuses).toEqual([]);
 });
 
 it("before_agent_start applies the current agent", () => {
