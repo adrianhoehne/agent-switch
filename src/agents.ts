@@ -22,6 +22,13 @@ const RESERVED_AGENT_NAME = MAIN_LABEL.toLowerCase();
 
 const AGENT_FILE_EXTENSION = ".md";
 
+/**
+ * The seven levels pi accepts, mirrored here as a value so a frontmatter level can
+ * be validated against a list rather than a hand-written condition.
+ */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
 export interface AgentDefinition {
   /** Frontmatter `name`, else the file name. */
   name: string;
@@ -31,6 +38,10 @@ export interface AgentDefinition {
   prompt: string;
   /** Frontmatter `prompt_mode`, default `"replace"`. */
   promptMode: "replace" | "append";
+  /** Frontmatter `model`, either `provider/modelId` or a bare model id. */
+  model?: string;
+  /** Frontmatter `thinking`; absent when the file names a level pi does not know. */
+  thinking?: ThinkingLevel;
   /** Frontmatter `enabled`, default `true`. */
   enabled: boolean;
   /** Absolute path of the `.md` file. */
@@ -160,6 +171,8 @@ function readAgentFile(path: string, source: AgentDefinition["source"]): AgentFi
       description: readString(frontmatter, "description") ?? name,
       prompt,
       promptMode: frontmatter["prompt_mode"] === "append" ? "append" : "replace",
+      model: readString(frontmatter, "model"),
+      thinking: readThinkingLevel(frontmatter),
       // A wrong type counts as a missing field, hence a permissive comparison.
       enabled: frontmatter["enabled"] !== false,
       sourcePath: path,
@@ -203,6 +216,23 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 function readString(frontmatter: Record<string, unknown>, key: string): string | undefined {
   const value = frontmatter[key];
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * A level outside the seven is left unset instead of clamped: a typo is a missing
+ * field, and guessing would silently change how much the model thinks.
+ */
+function readThinkingLevel(frontmatter: Record<string, unknown>): ThinkingLevel | undefined {
+  const value = frontmatter["thinking"];
+  return isThinkingLevel(value) ? value : undefined;
+}
+
+/**
+ * A guard rather than `includes`: the parsed value is `unknown`, and narrowing is
+ * what keeps the cast-free path open.
+ */
+function isThinkingLevel(value: unknown): value is ThinkingLevel {
+  return THINKING_LEVELS.some((level) => level === value);
 }
 
 function describeError(error: unknown): string {

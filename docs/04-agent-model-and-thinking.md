@@ -418,3 +418,5 @@ Gate: open.
 | Changing the model mid-conversation can force a compaction — accepted, same as switching by hand | operator | 2026-11-12 |
 | A press while a response streams is rejected with a warning instead of switching mid-run | operator | 2026-11-12 |
 | The 35 existing cases are confirmed by counting `it(` (agents 14, extension 9, prompt 5, state 7); a dev-plan doubt about the number was unfounded | orchestrator | 2026-11-12 |
+| Stage 1 committed: the two fields parse, an unknown level stays unset; review probed wrong types and `thinking: off` directly | code review, `✅` | 2026-11-12 |
+| An empty `model: ""` counts as absent, silently — it must not warn on every selection | code review stage 1, folded into stage 2 | 2026-11-12 |

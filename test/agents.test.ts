@@ -121,6 +121,49 @@ it("parses name, description and prompt mode", () => {
   expect(skips).toEqual([]);
 });
 
+it("parses model and thinking", () => {
+  // GIVEN a project agent that names a model as `provider/id` and one of the
+  // seven supported levels,
+  fixture.write(
+    "project",
+    "architect.md",
+    agentSource("name: architect\nmodel: anthropic/claude-sonnet-4-5\nthinking: high", "You architect."),
+  );
+
+  // WHEN it is loaded,
+  const agents = loadAgents(fixture.cwd, fixture.agentDir, { onSkip: recordSkip });
+
+  // THEN both fields reach the definition as written — the reference stays text
+  // because resolving it needs the model registry, and that lives in apply.ts:
+  expect(agents).toHaveLength(1);
+  expect(agents[0]).toMatchObject({
+    name: "architect",
+    model: "anthropic/claude-sonnet-4-5",
+    thinking: "high",
+  });
+  expect(skips).toEqual([]);
+});
+
+it("unknown thinking level is left unset", () => {
+  // GIVEN an agent whose level is a typo next to a usable model reference,
+  fixture.write(
+    "project",
+    "thinky.md",
+    agentSource("name: thinky\nmodel: some-model\nthinking: extreem", "Thinky text."),
+  );
+
+  // WHEN it is loaded,
+  const agents = loadAgents(fixture.cwd, fixture.agentDir, { onSkip: recordSkip });
+
+  // THEN the file still loads, with the level absent rather than clamped — a
+  // guessed level would change the thinking budget behind the operator's back —
+  // and the model is untouched, because the two fields stand on their own:
+  expect(agents).toHaveLength(1);
+  expect(agents[0]?.thinking).toBeUndefined();
+  expect(agents[0]?.model).toBe("some-model");
+  expect(skips).toEqual([]);
+});
+
 it("name falls back to the file name", () => {
   // GIVEN an agent file without a `name:` field,
   fixture.write("workspace", "helper.md", agentSource("description: Helps out", "Helps with chores."));
