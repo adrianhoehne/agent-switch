@@ -8,10 +8,13 @@
 # Kind ohne Schreibwerkzeuge kann keinen Produktcode anfassen. Nebeneffekt fuer die
 # Prompt-Verarbeitung: weniger Tool-Definitionen = kleinerer Child-Prompt.
 #
-# systemPromptMode bleibt beim Default `replace`: fuer eine Spec-Aufgabe ist Pi's
-# Basis-Prompt nicht noetig. `inheritProjectContext: true` sorgt dafuer, dass die
-# Repo-Regeln (AGENTS.md, docs/) gelten; der Skills-Katalog bleibt draussen, er kostet
-# nur Prompt-Platz.
+# `prompt_mode: replace` ist Absicht: fuer eine Spec-Aufgabe ist Pi's Basis-Prompt
+# nicht noetig, und der Body ist selbst vollstaendig. Folge, die man kennen muss:
+# `replace` heisst in tintinwebs Loader „kein AGENTS.md-Erbe". Die Repo-Regeln kommen
+# deshalb ueber die Anweisung im Body — der Architekt liest `AGENTS.md` und
+# `docs/README.md` mit seinem `read`-Tool, bevor er plant. Wer das Erbe stattdessen
+# im Prompt will, setzt `prompt_mode: append`; dann steht der Body hinter Pis Prompt.
+# `skills: false` haelt den Skills-Katalog draussen, er kostet nur Prompt-Platz.
 #
 # `bash` ist dabei, aber nur fuer Lesekommandos (git log/show/diff/status, head/tail,
 # grep) — "read-only bash" laesst sich nicht als Tool-Grenze ausdruecken, das ist
@@ -29,15 +32,11 @@
 # Projektblock an.
 name: architect
 description: Software architect - writes the dev plan for an increment (step order, files, risks, proof per step) into the spec the caller wrote, or, when no spec exists yet, the spec itself in the project's spec format; returns only the document
-aliases: SoftwareArchitect, architekt
-advertise: true
+prompt_mode: replace
 thinking: high
 tools: read, grep, find, ls, bash
-defaultContext: fresh
-inheritProjectContext: true
-inheritGlobalContext: false
-inheritSkills: false
-acceptanceRole: read-only
+skills: false
+inherit_context: false
 ---
 
 You are the software architect of this repository. You do not write product code, you do not run builds, you do
