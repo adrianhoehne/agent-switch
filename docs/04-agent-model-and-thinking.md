@@ -89,7 +89,7 @@ export function applySelection<M extends ModelRef>(
 | # | Criterion | Command / evidence |
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
-| 2 | The suite passes with 51 cases: the 35 existing names unchanged plus 16 new ones | `npm test` exits 0 and its summary reads `Tests  51 passed (51)` |
+| 2 | The suite passes with 53 cases: the 35 existing names unchanged plus 18 new ones | `npm test` exits 0 and its summary reads `Tests  53 passed (53)` |
 | 3 | `model` and `thinking` are parsed; an unknown level leaves the field unset | cases `parses model and thinking`, `unknown thinking level is left unset` |
 | 4 | `provider/id` resolves exactly; a bare id resolves against the available models; an unknown reference resolves to `undefined` | cases `resolves provider and id`, `resolves a bare model id`, `unknown model resolves to nothing` |
 | 5 | An agent with no fields changes nothing | case `no fields leaves model and thinking alone` asserts neither setter was called |
@@ -124,6 +124,7 @@ Criterion 12 is the operator's. Criteria 1–11 decide the commit.
 | | `resume applies the selection again` | a resumed label is not just a name |
 | | `press while streaming changes nothing` | the guard: no entry, no status, no model change, one warning |
 | | `Main restore that throws warns instead of crashing` | the snapshot's model can lose its key too; same rule as `applySelection` |
+| | `snapshot without a model still restores the level` | `ctx.model` can be undefined at capture time; the level is restored anyway |
 
 ## Risks and alternatives
 
@@ -204,7 +205,7 @@ are recorded in `## Log`.
    - "Never throws" is part of the contract: `try`/`catch` around both setters turns a
      throw into a warning and `…Applied: false`.
    Tests: the eight from the spec's table plus `a throwing setter warns instead of
-   crashing`. The two cases needing an out-of-union level cast with
+   crashing`. The one case needing an out-of-union level casts with
    `"ultra" as ThinkingLevel`, because `agents.ts` already drops it — this guard is the
    second line of defence.
    Proof: `npx vitest run test/apply.test.ts` exits 0 with 9 cases.
@@ -241,8 +242,10 @@ are recorded in `## Log`.
      and assertions unchanged, the `await` is mechanical. `writeAgent` gains an optional
      third parameter for frontmatter fields.
    - New cases: `cycle applies the agent's model and level`, `Main restores the snapshot`,
-     `agents do not re-snapshot`, `press while streaming changes nothing`.
-   Proof: `npx vitest run test/extension.test.ts` exits 0 with 13 cases.
+     `agents do not re-snapshot`, `press while streaming changes nothing`,
+     `Main restore that throws warns instead of crashing`,
+     `snapshot without a model still restores the level`.
+   Proof: `npx vitest run test/extension.test.ts` exits 0 with 15 cases.
 
 4. **Re-apply a resumed selection** — `src/extension.ts` and `test/extension.test.ts`.
    Make the `session_start` handler `async`; after `cycle = loadCycle(ctx)`,
@@ -250,14 +253,15 @@ are recorded in `## Log`.
    `if (currentLabel !== MAIN_LABEL) await applySelection(selectedAgent(), deps);` with a
    comment that this is the one place the extension applies without a keypress, and why it
    can never capture the snapshot (no capture statement exists in this handler).
-   `startSession` returns the handler's promise and the nine existing cases gain `await`.
+   `startSession` returns the handler's promise, and the nine existing cases that call it
+   gain `await`.
    New case `resume applies the selection again`: a state entry for an agent carrying
    `model: anthropic/claude-sonnet-4` and `thinking: high`; `session_start` records both
    setters. Also assert that a subsequent press to `Main` applies nothing
    (`mainSnapshot` is still `null`) — that pins the in-memory limit instead of leaving it
    to be discovered.
-   Proof: `npx vitest run test/extension.test.ts` exits 0 with 14 cases; `npm run
-   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  51 passed (51)`.
+   Proof: `npx vitest run test/extension.test.ts` exits 0 with 16 cases; `npm run
+   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  53 passed (53)`.
 
 5. **Not implementer work — the `docs/01` amendment (orchestrator, step 7).** The five
    places under `## Amendments to previous spec docs` are edited in this increment.
@@ -313,6 +317,8 @@ operator's, after 5.
 
 ## Known gaps
 
+Recorded 2026-11-12. Each is a limit of this increment, not a defect.
+
 | Gap | Why it stays open |
 |---|---|
 | The snapshot is in memory, not in the session | after a reload or resume of a session that was on an agent, `Main` applies nothing because there is no snapshot. Persisting it means a stored entry, a reader in `state.ts` and a decision about what "starting state" means for a resumed session — its own spec |
@@ -334,14 +340,33 @@ the same increment, as 02 and 03 did:
 | `## Known gaps`, the row about `model`/`thinking`/`tools` | reduced to `tools` |
 | `## Log` | keeps its rows; the follow-up is history |
 | `### What the next increment inherits` | the bullet naming `model`/`thinking` adoption as a later increment is now shipped |
+| frontmatter `description` and `## Goal` | **stay as they are**: 01's subject is still the prompt swap; model and thinking are additive and are documented here |
 | `docs/03-shift-tab-shortcut.md`, `## Non-goals` | "No change to how thinking levels are set … beyond releasing the key" stops holding the moment this ships |
 
 Proof after the amendment: `grep -n 'model.*thinking' docs/01-switch-main-agent-prompt.md`
-returns only its `## Log` row and its own review text, both history; `docs/03` no longer
-carries the non-goal sentence. This section is
+returns only its `## Log` row, which is history; `docs/03` no longer carries the non-goal
+sentence. This section is
 removed at step 7, when 01 is amended.
 
 ## Review
+
+**2026-11-12 — spec review, round 2 — 🔧 Fix these and I'll sign off — blockers: yes (1).**
+
+Four of the five round-1 blockers landed: the amendments list covers all four
+`model.*thinking` lines in `docs/01` (34, 254, 415, 493) plus `docs/03`'s non-goal,
+`restoreMain` catches, the undefined-model rule is written, and the twelve criteria end on
+the operator's live check.
+
+Blocking: the same arithmetic, one case later — `## Testing` named a new extension case
+that no stage built, so the plan reached 51 while the table implied 52.
+
+Non-blocking, applied: the undefined-model branch got its own case; the amendment proof no
+longer expects a line that will not be there; `docs/01`'s frontmatter and Goal are recorded
+as deliberately unchanged; stage 4 names `startSession`; stage 2 counts one cast, not two;
+`## Known gaps` is dated.
+
+Round 2 outcome: blocker and all notes applied. Totals recomputed: 35 + 2 + 9 + 6 + 1 =
+53, with 18 new cases.
 
 **2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (5).**
 
