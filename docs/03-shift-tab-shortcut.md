@@ -45,11 +45,11 @@ stay exactly as they are; only the key differs.
 | # | Criterion | Command / evidence |
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
-| 2 | The suite passes with 35 cases, the shortcut case asserting the new key | `npm test` exits 0; case `shortcut is registered` asserts `"shift+tab"` |
+| 2 | The suite passes with 35 cases and the shortcut case asserts the new key | `npm test` exits 0 and prints `Tests  35 passed (35)`; `grep -n '"shift+tab"' test/extension.test.ts` shows the literal in `shortcut is registered`, because vitest prints case names, not assertion values |
 | 3 | The thinking key is released | `node -e 'console.log(require("/home/adrian/.pi/agent/keybindings.json"))'` prints `{ 'app.thinking.cycle': [] }` |
-| 4 | pi loads the extension without a shortcut diagnostic | `pi --extension ./src/extension.ts` starts and shows no "conflicts with built-in shortcut. Skipping" line; `/hotkeys` lists `Shift+Tab` under **Extensions** |
+| 4 | pi loads the extension with the key | a fresh `pi --extension ./src/extension.ts` shows no shortcut conflict in the `[Extension issues]` startup block (that is where `getShortcuts()` reports it; stdout carries it only in a UI-less run), and `/hotkeys` lists `Shift+Tab` under **Extensions** |
 | 5 | The key cycles the agent | live session: footer `Main` → first press `architect` → further presses onward |
-| 6 | Thinking is still controllable | in the same session `/thinking high` sets the level; the footer's thinking segment changes |
+| 6 | Thinking is still controllable | in the same session `/thinking high` sets the level; the `Thinking level: high` status line confirms it, and the footer's thinking segment as well when the model supports reasoning |
 
 Criteria 4–6 are the operator's live check; the first two decide the commit.
 
@@ -61,18 +61,22 @@ Criteria 4–6 are the operator's live check; the first two decide the commit.
 | | the other 34 cases *(unchanged)* | the handler, the guard, the footer, persistence and restore do not care which key triggers them |
 
 No new case: the key is a constant, and asserting it twice adds nothing. The
-behaviour behind it is covered by the existing cases.
+behaviour behind it is covered by the existing cases. A test cannot cover the
+keybindings file either: it lives outside the repository, and pi exports only `.` and
+`./rpc-entry`, so the resolved binding table is unreachable without a deep import
+into `dist/` — the trap `docs/01` rejected for `pi-subagents`.
 
 ## Risks and alternatives
 
-- **Without the keybindings release the shortcut silently disappears.** pi drops the
-  registration and prints "conflicts with built-in shortcut. Skipping" at startup —
-  visible, but easy to miss. The release is a one-line file that has to exist on
-  every machine this project runs on; `## Known gaps` records that.
-- **`shift+tab` inside pi's dialogs.** The pickers and selectors use `shift+tab` for
-  their own navigation in some terminals. Extension shortcuts fire in the editor, not
-  inside a modal, so the risk is a modifier that does not arrive while a dialog is
-  open — acceptable, and the live check covers the editor case.
+- **Without the keybindings release the shortcut disappears.** pi drops the
+  registration and reports it in the `[Extension issues]` startup block — visible,
+  but only there, which is exactly why criterion 4 exists. The release is a one-line
+  file that has to exist on every machine this project runs on.
+- **`shift+tab` inside pi's dialogs.** `app.thinking.cycle` is the only binding on
+  that key in 1.3.0 — no selector or picker handles `\x1b[Z`, and pi's picker
+  bindings are explicitly outside the reserved list. So inside a dialog `shift+tab`
+  simply does nothing; the live check covers the editor case, which is where the
+  extension handler runs.
 - **Rejected alternative: keeping both keys.** Two shortcuts for one action shows up
   twice in `/hotkeys` and doubles the conflict surface. The one the operator wants is
   the one that stays.
@@ -81,12 +85,22 @@ behaviour behind it is covered by the existing cases.
 
 ## Touch boundary
 
-- Everything inside `/home/adrian/agent-switch`.
-- **`~/.pi/agent/keybindings.json`** is the one file outside the project this
-  increment may create or change, and only to disable `app.thinking.cycle`.
+The complete list of files this increment touches, and who owns each:
+
+| File | Owner |
+|---|---|
+| `src/extension.ts` | implementer (stage 1) |
+| `test/extension.test.ts` | implementer (stage 1) |
+| `docs/01-switch-main-agent-prompt.md` | orchestrator (stage 4, the amendments) |
+| `~/.pi/agent/keybindings.json` | **orchestrator only (stage 2)** — see below |
+
 - **Not** any other file under `~/.pi/agent/**`, not `~/.agents/**`, not the agent
   definitions.
 - **Not** generated folders: `node_modules/`, `coverage/`, `dist/`.
+- `~/.pi/agent/keybindings.json` is outside the project and global: it changes key
+  handling for every session and every project on this machine. The operator agreed
+  to its creation on 2026-11-12 (see `## Log`); an implementer must not create or
+  edit it, and it is not part of any commit.
 
 ## Additional dependencies
 
@@ -99,14 +113,143 @@ with the operator on 2026-11-12.
 
 ## Dev plan
 
-(pending — filled by the architect in step 3 of the loop)
+1. **Move the key in the extension and its test** — one stage, because either half
+   alone leaves the suite red. In `src/extension.ts` change
+   `const SHORTCUT_KEY = "ctrl+shift+a"` to `"shift+tab"` and rewrite the comment
+   above it: it currently justifies the literal-key choice only; it must now also say
+   that pi's `app.thinking.cycle` owns `shift+tab` and is released in
+   `<agent-dir>/keybindings.json`. Touch nothing else in the file —
+   `registerShortcut(...)`, `SHORTCUT_DESCRIPTION`, the empty-cycle guard and
+   `setLabel` stay byte-identical. In `test/extension.test.ts` change the single
+   literal in the case `shortcut is registered` from `"ctrl+shift+a"` to
+   `"shift+tab"`; the helper `pressShortcut` reads `stub.shortcuts[0]`, so no other
+   case and no new case is needed or wanted.
+   Proof: `npm run typecheck` exits 0; `npm test` exits 0 and its summary reads
+   `Tests  35 passed (35)`. The literal itself is not printed by vitest; criterion 2's
+   "asserting the new key" is shown by the diff of that line, not by the run.
+
+2. **Create `~/.pi/agent/keybindings.json` — orchestrator work, not the implementer's.**
+   Content is exactly `{ "app.thinking.cycle": [] }`. Reason for the split: it is the
+   one file outside `/home/adrian/agent-switch`, `AGENTS.md` → *Touch boundary* puts
+   everything outside the repo behind the operator's agreement, and it is global
+   configuration — it changes key handling for every session and every project on
+   this machine, cannot be reviewed as a repo diff, and rolls back by deleting one
+   file. The agreement exists: the trade is recorded in the spec's `## Log` and in
+   the touch boundary. The file is not part of the commit.
+   Proof: `node -e 'console.log(require("/home/adrian/.pi/agent/keybindings.json"))'`
+   prints `{ 'app.thinking.cycle': [] }`.
+
+3. **Not implementer work: the live checks.** Criteria 4, 5 and 6 need a running pi
+   in a real terminal and belong to the operator, run after stages 1 and 2.
+
+4. **Amend `docs/01` — orchestrator work.** The places listed under `## Amendments to
+   previous spec docs` are updated in the same increment: the key literal where 01
+   documents the shortcut, and the reserved-list sentence, which changes meaning
+   because `shift+tab` *is* in that list. `## Log` rows keep the old key — a log is
+   history, not documentation.
+   Proof: `grep -rn 'ctrl+shift+a' docs/01-switch-main-agent-prompt.md src/ test/`
+   returns only `## Log` lines; `npm run typecheck` and `npm test` stay green.
+
+Who runs what: 1 the implementer, 2 and 3 the orchestrator as part of acceptance,
+4 the orchestrator, the live criteria the operator.
+
+### What could go wrong
+
+- **The gap between stage 1 and stage 2 is a silently dead shortcut.** With
+  `SHORTCUT_KEY = "shift+tab"` and no keybindings file, pi drops the registration. Do
+  not start a session between the two stages and do not read a missing shortcut there
+  as a regression.
+- **Hand-written JSON breaks the whole file.** pi reads `<agent-dir>/keybindings.json`
+  as one object; a trailing comma takes every binding in it down, not just this one.
+- **`/reload` is the documented step** after editing the file, but a fresh
+  `pi --extension ./src/extension.ts` is the cleaner evidence for criterion 4: it
+  re-reads both the keybindings and the extension from disk.
+- **The spec's `## Risks` referred to a `## Known gaps` section that did not exist.**
+  The section is now there; do not repair it as part of the implementation.
+- **Do not add a test case** to "cover" the keybindings file. It lives outside the
+  repo, `vitest` cannot see it, and criterion 2's 35 would break for nothing.
+
+### Ordering and dependencies
+
+Stage 1 has no prerequisite. Stage 2 has no dependency on stage 1 but must be finished
+before stage 3 and before the commit, because criterion 3 is acceptance evidence.
+Criterion 4 is the gate that proves the two halves fit; if it fails, the fault is in
+stage 2 first, not in the constant. Sequence: 1 → 2 → 3 → review → commit.
+
+### What the next increment inherits
+
+- **No fallback.** `ctrl+shift+a` is gone; a machine without
+  `~/.pi/agent/keybindings.json` has no working shortcut at all. The file is a
+  prerequisite, not an optimisation.
+- **Thinking lost its key globally.** `app.thinking.cycle` stays unbound for every
+  project on this machine until it is rebound; `/thinking [level]` remains.
+- **Still out of scope:** a `/agent` slash command, a configurable shortcut, a second
+  key. Each is a separate spec.
+- `docs/README.md`'s `Status` column is the orchestrator's to maintain.
+
+## Known gaps
+
+| Gap | Why it stays open |
+|---|---|
+| `~/.pi/agent/keybindings.json` is a prerequisite on every machine | without it pi drops the registration and the extension has no shortcut at all. It cannot live in the repository, because pi reads it from the agent directory |
+| `app.thinking.cycle` stays unbound for every project on this machine | the release is global by nature; `/thinking [level]` is the remaining entry point, and rebinding the key per project is not something pi supports |
+| `/hotkeys` renders an empty key cell for "Cycle thinking level" | with the action unbound, the row keeps its label and loses its key. Cosmetic; no action |
+
+## Amendments to previous spec docs
+
+This increment changes a key that `docs/01-switch-main-agent-prompt.md` documents. It
+is amended in place in the same increment — the route that `docs/README.md` prescribes
+for a changed behaviour, and the one increment 02 already took (`8491005`). The places
+that name the old key:
+
+| `docs/01` location | Change |
+|---|---|
+| frontmatter `description`, `## Goal`, `## Behaviour` table | `ctrl+shift+a` → `shift+tab` |
+| criterion 9, `## Testing` row for `shortcut is registered` | the literal and its expectation |
+| `## Risks` shortcut bullet, the `Key`-not-exported paragraphs, stage 4 of `## Dev plan`, `## Log` | the literal in the rationale |
+| **`## Risks`, the sentence "`ctrl+shift+a` is in neither list"** | **changes meaning, not just wording**: `shift+tab` *is* in the reserved list, so the sentence must now say that the key is owned by `app.thinking.cycle` and released in `keybindings.json` |
+
+The `## Log` rows keep the old key where they record history; a log is not
+retroactively edited. Proof after the amendment: `grep -rn 'ctrl+shift+a'
+docs/01-switch-main-agent-prompt.md src/ test/` returns only `## Log` lines. This
+section is removed at step 7, when 01 is amended.
 
 ## Review
 
-(no rounds yet)
+**2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (1).**
+
+Verified the spine in the installed 1.3.0 rather than trusting the prose: an empty
+list disables an action (`KeybindingValueSchema` has no `minItems`, and the manager
+resolves an explicit `[]` instead of falling back to defaults), `app.thinking.cycle`
+is in `RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS`, `shift+tab` is otherwise unbound
+(`\x1b[Z` → `shift+tab`, covered by legacy, Kitty CSI-u and modifyOtherKeys), the
+`[Extension issues]` block is where the conflict diagnostic lands, `/hotkeys` prints
+`Shift+Tab` for an extension key, and the 35-case arithmetic holds.
+
+Blocking: `03` changes a key that `docs/01` documents at ten places and said nothing
+about it. `docs/README.md` offers change-in-place or a spec with `## Amendments to
+previous spec docs`; this spec took neither, leaving an `active` spec that names a
+key which no longer exists — including the sentence "`ctrl+shift+a` is in neither
+list", whose meaning flips because `shift+tab` *is* reserved. Fix: amendments section
+plus a stage that carries it out, amending 01 in place as increment 02 already did.
+
+Non-blocking, all folded in: criterion 2 names a grep for the literal (vitest prints
+case names, not assertion values); criterion 6 names the `Thinking level:` status line
+as evidence that does not depend on the model supporting reasoning; the touch boundary
+lists the owner per file and the implementer is told not to touch the global file; the
+"picker navigation" risk was factually wrong and is replaced (no selector handles
+`\x1b[Z`); `/hotkeys` rendering an empty cell for "Cycle thinking level" is a Known
+gap; "no new test case" now cites pi's two-entry exports map instead of only
+"vitest cannot see the file"; the "silently disappears" bullet no longer contradicts
+itself.
+
+Round 1 outcome: block and all notes applied.
 
 ## Log
 
 | Decision | Source | Date |
 |---|---|---|
 | `shift+tab` becomes the cycle key; `app.thinking.cycle` is released; no second key, no slash command, no configurability | operator | 2026-11-12 |
+| The operator agreed that this increment creates `~/.pi/agent/keybindings.json` — a global file outside the repository | operator | 2026-11-12 |
+| Spec review round 1 blocker: `docs/01` documents the old key and is amended in place, with the reserved-list sentence called out as a meaning change | spec review round 1 | 2026-11-12 |
+| Round-1 notes: criterion 2 names the grep for the literal, criterion 6 names the always-available status line, the touch boundary lists owner per file, the picker risk was factually wrong and is replaced, `/hotkeys` empty cell added to Known gaps, the "no new test case" reason now cites pi's exports map | spec review round 1 | 2026-11-12 |
