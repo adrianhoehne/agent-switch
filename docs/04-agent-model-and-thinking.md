@@ -89,7 +89,7 @@ export function applySelection<M extends ModelRef>(
 | # | Criterion | Command / evidence |
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
-| 2 | The suite passes, 35 existing cases unchanged plus the new ones | `npm test` exits 0; the new case names appear in the output |
+| 2 | The suite passes with 51 cases: the 35 existing names unchanged plus 16 new ones | `npm test` exits 0 and its summary reads `Tests  51 passed (51)` |
 | 3 | `model` and `thinking` are parsed; an unknown level leaves the field unset | cases `parses model and thinking`, `unknown thinking level is left unset` |
 | 4 | `provider/id` resolves exactly; a bare id resolves against the available models; an unknown reference resolves to `undefined` | cases `resolves provider and id`, `resolves a bare model id`, `unknown model resolves to nothing` |
 | 5 | An agent with no fields changes nothing | case `no fields leaves model and thinking alone` asserts neither setter was called |
@@ -117,11 +117,13 @@ Criterion 12 is the operator's. Criteria 1–11 decide the commit.
 | | `bad model keeps the model and applies thinking` | the two fields fall back independently |
 | | `refused model keeps the current one and warns` | `setModel → false` is a warning, not a change |
 | | `unusable level warns and keeps the level` | the thinking half of the same rule |
+| | `a throwing setter warns instead of crashing` | `setModel` throws when a model has no API key; the contract is "never throws" |
 | `test/extension.test.ts` | `cycle applies the agent's model and level` | the handler wires the decision half |
 | | `Main restores the snapshot` | Main is the initial state |
 | | `agents do not re-snapshot` | the snapshot is taken once, on the first exit |
 | | `resume applies the selection again` | a resumed label is not just a name |
 | | `press while streaming changes nothing` | the guard: no entry, no status, no model change, one warning |
+| | `Main restore that throws warns instead of crashing` | the snapshot's model can lose its key too; same rule as `applySelection` |
 
 ## Risks and alternatives
 
@@ -180,10 +182,11 @@ are recorded in `## Log`.
    `readAgentFile` next to `promptMode`: `model` from `readString(frontmatter, "model")`,
    `thinking` through `readThinkingLevel(frontmatter)` which returns `undefined` for
    anything outside `THINKING_LEVELS`. Reuse the "a wrong type is a missing field"
-   convention — it also covers YAML turning an unquoted `thinking: off` into `false`.
+   convention. (`thinking: off` arrives as the string `"off"` in pi 1.3.0, not as `false`;
+   no special case is needed.)
    Do not touch `loadAgents`, the skip rules, `findFileProblem` or any other key.
    Tests: `parses model and thinking`, `unknown thinking level is left unset`.
-   Proof: `npx vitest run test/agents.test.ts` exits 0 with 15 cases; `npm run typecheck`
+   Proof: `npx vitest run test/agents.test.ts` exits 0 with 16 cases; `npm run typecheck`
    exits 0 — the type check is the real guard here, because the existing cases compare
    fields one by one and added optional keys cannot break them.
 
@@ -215,8 +218,10 @@ are recorded in `## Log`.
      `setModel`, `setThinkingLevel`, `warn` (→ `ctx.ui.notify(message, "warning")`). Built
      per call, never cached: `ctx` differs between `session_start` and the handler.
    - `let mainSnapshot: MainState | null = null;` in the factory closure.
-   - `async function restoreMain(snapshot, deps)`: `null` → nothing; model first, `false` →
-     warn naming provider/id; then `setThinkingLevel`. It calls `deps` directly because the
+   - `async function restoreMain(snapshot, deps)`: `null` → nothing; a snapshot without a
+     model (`ctx.model` is `Model | undefined`) → skip the model silently and keep the
+     level; model first, `false` **or a throw** → warn naming provider/id; then
+     `setThinkingLevel`. It calls `deps` directly because the
      snapshot holds a `Model`, not a reference string.
    - The shortcut handler becomes `async (ctx)` and keeps its order, with two insertions:
      after the `cycle.length === 0` guard, `if (!ctx.isIdle()) { ctx.ui.notify("A response
@@ -252,7 +257,7 @@ are recorded in `## Log`.
    (`mainSnapshot` is still `null`) — that pins the in-memory limit instead of leaving it
    to be discovered.
    Proof: `npx vitest run test/extension.test.ts` exits 0 with 14 cases; `npm run
-   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  50 passed (50)`.
+   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  51 passed (51)`.
 
 5. **Not implementer work — the `docs/01` amendment (orchestrator, step 7).** The five
    places under `## Amendments to previous spec docs` are edited in this increment.
@@ -313,6 +318,7 @@ operator's, after 5.
 | The snapshot is in memory, not in the session | after a reload or resume of a session that was on an agent, `Main` applies nothing because there is no snapshot. Persisting it means a stored entry, a reader in `state.ts` and a decision about what "starting state" means for a resumed session — its own spec |
 | A bare model id resolves first-match-wins | `getAvailable()` order decides; a tie rule (scoped models first, or a warning on ambiguity) is unbuilt |
 | `thinking` is not checked against the chosen model | pi clamps an unsupported level and the footer shows the effective value; warning about a clamp is not part of this increment |
+| A resume re-applies the model even when it is already current | `pi.setModel` appends a `model_change` entry, so every resume writes one. `SelectionDeps` has no `currentModel`/`currentThinking`, so a no-op skip is not possible without widening the interface |
 
 ## Amendments to previous spec docs
 
@@ -327,14 +333,39 @@ the same increment, as 02 and 03 did:
 | `## Non-goals`, the first bullet ("Not adopting `model`, `thinking` or `tools`") | narrowed to `tools`; the other two are adopted by this increment |
 | `## Known gaps`, the row about `model`/`thinking`/`tools` | reduced to `tools` |
 | `## Log` | keeps its rows; the follow-up is history |
+| `### What the next increment inherits` | the bullet naming `model`/`thinking` adoption as a later increment is now shipped |
+| `docs/03-shift-tab-shortcut.md`, `## Non-goals` | "No change to how thinking levels are set … beyond releasing the key" stops holding the moment this ships |
 
 Proof after the amendment: `grep -n 'model.*thinking' docs/01-switch-main-agent-prompt.md`
-no longer reports a section that claims the two fields are not adopted. This section is
+returns only its `## Log` row and its own review text, both history; `docs/03` no longer
+carries the non-goal sentence. This section is
 removed at step 7, when 01 is amended.
 
 ## Review
 
-(no rounds yet)
+**2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (5).**
+
+The trap-notes were verified against the installed 1.3.0 and hold: `setModel` clamps
+thinking inside itself, and a resumed session's `ctx.model` is already the stored one, so
+capturing the snapshot only in the shortcut handler is right. The local seven-level union
+matches `ThinkingLevel` exactly, `registerShortcut` accepts a promise, `isIdle()`,
+`getAvailable()` and the boolean `setModel` exist. The increment is still one increment.
+
+Blocking: (1) case arithmetic — `agents` has 14 cases (13 `it` plus one `it.skipIf`), so
+stage 1 ends at 16 and the increment at 51, not 15 and 50; (2) `restoreMain` would throw
+out of the keypress, because `setModel` throws for a model without an API key instead of
+returning `false`, so the `## Risks` claim described code nobody had planned; (3)
+`ctx.model` is `Model | undefined`, so the snapshot needed a rule for a missing model; (4)
+the amendments list missed `docs/03`'s non-goal about thinking levels and `docs/01`'s
+"What the next increment inherits"; (5) the amendment proof could never come back clean,
+because the `## Log` row deliberately keeps the words.
+
+Non-blocking, folded in: no YAML `false` case for `thinking: off` (it arrives as the
+string); a resume appends a `model_change` entry every time, now a Known gap; the
+throwing-setter and restore-throw cases are in `## Testing`; criterion 2 is pinned to
+`Tests  51 passed (51)`.
+
+Round 1 outcome: all five blockers and all four notes applied.
 
 ## Log
 
