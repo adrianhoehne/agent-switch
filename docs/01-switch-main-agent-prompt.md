@@ -240,6 +240,20 @@ Exact versions live in `package-lock.json`; `npm install` is the only setup step
   `thinking` and `tools` from the agent file is wanted ("part 2"; opencode ties the
   model to the agent and switches it along).
 
+## Known gaps
+
+Recorded during implementation and review, 2026-11-12. None blocks the
+increment; each is a follow-up with its reason.
+
+| Gap | Why it is open |
+|---|---|
+| A shortcut press with an empty cycle appends `{ name: "Main" }`, a selection event that did not happen | review note; the guard `if (cycle.length === 0) return` is not in the code |
+| `restoreSelection` warns "no longer available" for an agent that exists but is `enabled: false` | the file is available, it is simply not offered; wording |
+| No case proves that a second `session_start` does not duplicate the cycle | correct by construction (`cycle = loadCycle(ctx)`), unproven by a test |
+| `lastSelectedLabel` reads `getEntries()` (whole session) rather than `getBranch()` | a branched session can restore a label from an abandoned branch (spec review round 1) |
+| `lstatSync` and the later `readFileSync` are not atomic | a file swapped to a symlink between the two calls would still be read; closing it needs `openSync` + `fstat` |
+| The tie case discriminates only under full-ICU Node | a `small-icu` build returns `0` for both comparators and the lock disappears silently |
+
 ## Dev plan
 
 Prerequisite per stage: `npm install` writes `package-lock.json` (committed, never
