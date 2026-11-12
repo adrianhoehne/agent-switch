@@ -287,6 +287,61 @@ it("press before session_start is a no-op", () => {
   expect(session.statuses).toEqual([]);
 });
 
+it("second session_start does not duplicate the cycle", () => {
+  // GIVEN two project agents and a session that has started, so the cycle is
+  // `Main, alpha, zulu`,
+  fixture.writeAgent("alpha", REVIEWER_PROMPT);
+  fixture.writeAgent("zulu", REVIEWER_PROMPT);
+  const stub = createStubApi();
+  agentSwitch(stub.api);
+  // No stored entries on purpose: without them the cycle starts on `Main`, so the
+  // three presses below prove the whole walk instead of continuing from a label a
+  // previous session restored.
+  const session = createStubContext({ cwd: fixture.cwd });
+  startSession(stub, session);
+
+  // WHEN a third agent appears and the session starts a second time — a resume
+  // fires `session_start` again, and the fixture changed in between,
+  fixture.writeAgent("mike", REVIEWER_PROMPT);
+  startSession(stub, session);
+
+  // AND the shortcut is pressed three times,
+  pressShortcut(stub, session);
+  pressShortcut(stub, session);
+  pressShortcut(stub, session);
+
+  // THEN the presses walk the rebuilt cycle exactly once: `alpha`, `mike`, `zulu`.
+  // A cycle that had been appended to instead of rebuilt would read
+  // `Main, alpha, zulu, Main, alpha, mike, zulu`, so the walk would already diverge
+  // on the second press (`zulu`, then `Main`) and never reach `mike` in the middle.
+  // Read from the recorded entries, not from `session.statuses`: the statuses also
+  // hold the two footer writes the two `session_start` calls made.
+  expect(stub.entries.map((entry) => entry.data.name)).toEqual(["alpha", "mike", "zulu"]);
+});
+
+it("skipped file surfaces a warning", () => {
+  // GIVEN an agent file whose frontmatter claims the label the reset position
+  // already owns, so `readAgentFile` holds it back instead of loading it,
+  const skippedPath = fixture.writeAgent(MAIN_LABEL.toLowerCase(), REVIEWER_PROMPT);
+  const stub = createStubApi();
+  agentSwitch(stub.api);
+  // No stored entries on purpose: `restoreSelection` adds a warning of its own when
+  // a recorded label is gone, and this case must see the skip warning alone.
+  const session = createStubContext({ cwd: fixture.cwd });
+
+  // WHEN the session starts and discovery runs,
+  startSession(stub, session);
+
+  // THEN exactly one warning reaches the operator, naming the file and the reason,
+  // because an agent silently missing from the cycle looks like a broken extension:
+  expect(session.notifications).toEqual([
+    expect.objectContaining({ type: "warning", message: expect.stringContaining(skippedPath) }),
+  ]);
+  expect(session.notifications).toEqual([
+    expect.objectContaining({ type: "warning", message: expect.stringContaining("reserved") }),
+  ]);
+});
+
 it("before_agent_start applies the current agent", () => {
   // GIVEN one project agent and a session that has started on it,
   fixture.writeAgent("reviewer", REVIEWER_PROMPT);

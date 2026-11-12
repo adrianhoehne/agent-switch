@@ -1,22 +1,27 @@
 ---
 description: Closes three test gaps of increment 01 and makes a shortcut press without a built cycle a no-op, so those three behaviours are held by tests instead of by construction.
-status: proposed
+status: active
 ---
 
 # 02 — Hold the cycle's edge cases in tests
 
+Implemented on 2026-11-12. All six acceptance criteria are met; the live check that
+would have covered the guard is impossible in pi 1.3.0 and is recorded under
+`## Known gaps`.
+
 ## Goal
 
-Three behaviours of the extension are correct today but unproven: a second
-`session_start` rebuilding the cycle, a skipped agent file reaching the user as a
-warning, and a keypress when no cycle exists. The third is also a latent defect:
-the handler writes an `agent-switch-state` entry for `Main` — a selection nobody
-made. pi 1.3.0 does not offer a reachable path to it (the TUI wires extension
-shortcuts only after `session_start`), so the guard is defensive rather than a
-reproduced bug: it costs four lines and keeps the handler honest if that wiring
-order ever changes. This increment adds the guard and covers all three behaviours
-with tests, so a regression fails the suite instead of resting on the reading of
-the code.
+The shortcut handler writes no selection entry when no cycle exists: a press before
+`session_start` has built one is a silent no-op instead of recording a `Main`
+selection nobody made. pi 1.3.0 offers no live path to that press — it wires
+extension shortcuts only after `session_start` — so the guard is defensive and the
+unit case is its proof.
+
+Beyond that guard, three behaviours of the extension are held by tests instead of by
+the reading of the code: a second `session_start` rebuilding the cycle rather than
+duplicating it, a skipped agent file reaching the operator as a warning with path
+and reason, and a press without a cycle leaving both the entry list and the footer
+untouched.
 
 ## Non-goals
 
@@ -276,3 +281,9 @@ Gate: open.
 | Note 7: criterion 5 says "skip reason" | spec review round 1 | 2026-11-12 |
 | Note 8: frontmatter claims "those three behaviours", not "every behaviour" | spec review round 1 | 2026-11-12 |
 | Round-2 notes: duplicate `## Open questions` merged, stub `data` narrowing added to stage 1, one Log line per finding, `## Known gaps` dated, "moves then inverted" wording | spec review round 2 | 2026-11-12 |
+| Stage 1 committed: guard plus the no-op case; the case fails on the old code (one entry, one status writes), so it is probative | code review, `✅` | 2026-11-12 |
+| Stages 2 and 3 committed together: one code review covered both test-only stages instead of one gate each — a deliberate deviation | orchestrator | 2026-11-12 |
+| Stage 2 non-vacuous: removing the `onSkip` wiring leaves it as the only failure | implementer, confirmed by review | 2026-11-12 |
+| Stage 3 non-vacuous: an appending rebuild yields `alpha, zulu, Main` and fails exactly this case; `src/extension.ts` restored byte-identically | implementer, confirmed by review | 2026-11-12 |
+| 35 cases green, `npm run typecheck` green, `package-lock.json` untouched | orchestrator | 2026-11-12 |
+| Spec set to `active` | orchestrator | 2026-11-12 |
