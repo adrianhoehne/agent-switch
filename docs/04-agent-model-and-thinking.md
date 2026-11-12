@@ -89,7 +89,7 @@ export function applySelection<M extends ModelRef>(
 | # | Criterion | Command / evidence |
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
-| 2 | The suite passes with 53 cases: the 35 existing names unchanged plus 18 new ones | `npm test` exits 0 and its summary reads `Tests  53 passed (53)`. Under root the `it.skipIf` case skips, so the summary reads `52 passed | 1 skipped` |
+| 2 | The suite passes with 54 cases: the 35 existing names unchanged plus 19 new ones | `npm test` exits 0 and its summary reads `Tests  54 passed (54)`. Under root the `it.skipIf` case skips, so the summary reads `53 passed | 1 skipped` |
 | 3 | `model` and `thinking` are parsed; an unknown level leaves the field unset | cases `parses model and thinking`, `unknown thinking level is left unset` |
 | 4 | `provider/id` resolves exactly; a bare id resolves against the available models; an unknown reference resolves to `undefined` | cases `resolves provider and id`, `resolves a bare model id`, `unknown model resolves to nothing` |
 | 5 | An agent with no fields changes nothing | case `no fields leaves model and thinking alone` asserts neither setter was called |
@@ -261,7 +261,7 @@ are recorded in `## Log`.
    (`mainSnapshot` is still `null`) — that pins the in-memory limit instead of leaving it
    to be discovered.
    Proof: `npx vitest run test/extension.test.ts` exits 0 with 16 cases; `npm run
-   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  53 passed (53)`.
+   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  54 passed (54)`.
 
 5. **Not implementer work — the `docs/01` amendment (orchestrator, step 7).** The five
    places under `## Amendments to previous spec docs` are edited in this increment.
@@ -421,3 +421,6 @@ Gate: open.
 | Stage 1 committed: the two fields parse, an unknown level stays unset; review probed wrong types and `thinking: off` directly | code review, `✅` | 2026-11-12 |
 | An empty `model: ""` counts as absent, silently — it must not warn on every selection | code review stage 1, folded into stage 2 | 2026-11-12 |
 | Stage 2 committed: the decision half is pure and pi-free; first-slash split, first-match bare id, independent fallbacks, never throws | code review, `✅` | 2026-11-12 |
+| Totals corrected to 54 cases (19 new): stage 2 carries ten, not nine, because the empty-reference case was added after the review | stage 3 report | 2026-11-12 |
+| `press before session_start is a no-op` asserts `resolves.toBeUndefined()` instead of `not.toThrow()` — the old form goes vacuous for an async handler; same intent | stage 3 report, for review | 2026-11-12 |
+| Stage 3 committed: one capture site in the handler, idle guard before any mutation, `restoreMain` skips a missing model and warns on refusal or throw; `before_agent_start` untouched. The assertion rewrite was judged justified; the `apply.ts` message nit and the 54 correction were authorised orchestrator work | code review, `✅` | 2026-11-12 |

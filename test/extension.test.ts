@@ -11,6 +11,7 @@ import type {
 import { afterEach, beforeEach, expect, it } from "vitest";
 
 import agentSwitch from "../src/extension";
+import type { ThinkingLevel } from "../src/agents";
 import { MAIN_LABEL, STATE_CUSTOM_TYPE } from "../src/state";
 
 /**
@@ -28,8 +29,11 @@ const REVIEWER_PROMPT = "You review code.";
 interface ExtensionFixture {
   /** Stands in for the project working directory of the session. */
   readonly cwd: string;
-  /** Writes one project agent file and returns its absolute path. */
-  writeAgent(name: string, body: string): string;
+  /**
+   * Writes one project agent file and returns its absolute path. `frontmatter`
+   * adds the fields under test (`model`, `thinking`) next to the generated `name`.
+   */
+  writeAgent(name: string, body: string, frontmatter?: Record<string, string>): string;
   remove(): void;
 }
 
@@ -61,9 +65,15 @@ function createFixture(): ExtensionFixture {
 
   return {
     cwd,
-    writeAgent(name, body) {
+    writeAgent(name, body, frontmatter = {}) {
       const path = join(projectAgents, `${name}.md`);
-      writeFileSync(path, `---\nname: ${name}\n---\n\n${body}\n`, "utf8");
+      // `name` first so a case cannot accidentally shadow the file's identity; the
+      // optional fields follow in insertion order, which is the order the operator
+      // reads.
+      const header = Object.entries({ name, ...frontmatter })
+        .map(([key, value]) => `${key}: ${value}`)
+        .join("\n");
+      writeFileSync(path, `---\n${header}\n---\n\n${body}\n`, "utf8");
       return path;
     },
     remove() {
@@ -84,7 +94,6 @@ function restoreEnvironmentVariable(name: string, previousValue: string | undefi
 
 /** What the extension registered, as far as the stub could see it. */
 type RecordedHandler = (event: unknown, ctx: ExtensionContext) => unknown;
-
 interface RecordedShortcut {
   readonly key: string;
   readonly description: string | undefined;
@@ -96,24 +105,87 @@ interface RecordedEntry {
   readonly data: { name: string };
 }
 
+/** A stand-in for pi's `Model`, reduced to the two fields every comparison reads. */
+interface StubModel {
+  readonly provider: string;
+  readonly id: string;
+}
+
+/**
+ * The models the fixture session may switch to: its starting model plus the two an
+ * agent file below names. `getAvailable()` returns exactly this, so a reference
+ * outside it really does fail to resolve.
+ */
+const STARTING_MODEL: StubModel = { provider: "anthropic", id: "claude-opus-4" };
+const AVAILABLE_MODELS: readonly StubModel[] = [
+  STARTING_MODEL,
+  { provider: "anthropic", id: "claude-sonnet-4" },
+  { provider: "acme", id: "zulu-1" },
+];
+
+/** The level the fixture session starts on. Deliberately not `high`. */
+const STARTING_THINKING: ThinkingLevel = "low";
+
+/**
+ * The session state the two stubs share.
+ *
+ * It is mutable on purpose: after a real `setModel` pi really is on the new model,
+ * so a snapshot taken on a later press would record the agent's model. A stub with
+ * a fixed model could not expose that bug.
+ */
+interface StubSession {
+  model: StubModel | undefined;
+  thinkingLevel: ThinkingLevel;
+}
+
+function createStubSession(
+  options: { model?: StubModel | null; thinkingLevel?: ThinkingLevel } = {},
+): StubSession {
+  return {
+    // `null` is a session that reached the handler before a model was resolved;
+    // omitted means the ordinary starting model.
+    model: options.model === undefined ? STARTING_MODEL : (options.model ?? undefined),
+    thinkingLevel: options.thinkingLevel ?? STARTING_THINKING,
+  };
+}
+
+interface StubApiOptions {
+  /** Shared with the context, so a `setModel` is visible to the next press. */
+  readonly session?: StubSession;
+  /** What `setModel` answers: pi refuses a switch without throwing. Default `true`. */
+  readonly acceptModel?: boolean;
+  /** `setModel` throws for a model without usable credentials; simulate that. */
+  readonly setModelThrows?: boolean;
+}
+
 interface StubApi {
   readonly api: ExtensionAPI;
   readonly handlers: Map<string, RecordedHandler>;
   readonly shortcuts: RecordedShortcut[];
   readonly entries: RecordedEntry[];
+  /** The state `setModel` and `getThinkingLevel` read and write. */
+  readonly session: StubSession;
+  /** Every `setModel` call as `provider/id`, refused and thrown ones included. */
+  readonly modelCalls: string[];
+  /** Every `setThinkingLevel` call, in order. */
+  readonly thinkingLevelCalls: ThinkingLevel[];
 }
 
 /**
- * The three members this extension uses, recording every call in plain arrays.
+ * The members this extension uses from the API, recording every call in plain
+ * arrays.
  *
  * The cast is unavoidable and belongs here alone: `ExtensionAPI` declares dozens of
- * members (model access, tool registration, rendering) that a stub would have to
- * spell out only to throw. Nothing outside this factory casts anything.
+ * members (tool registration, rendering, commands) that a stub would have to spell
+ * out only to throw. Nothing outside this factory casts anything.
  */
-function createStubApi(): StubApi {
+function createStubApi(options: StubApiOptions = {}): StubApi {
   const handlers = new Map<string, RecordedHandler>();
   const shortcuts: RecordedShortcut[] = [];
   const entries: RecordedEntry[] = [];
+  const modelCalls: string[] = [];
+  const thinkingLevelCalls: ThinkingLevel[] = [];
+  const session = options.session ?? createStubSession();
 
   const api = {
     on(event: string, handler: RecordedHandler): () => void {
@@ -134,9 +206,35 @@ function createStubApi(): StubApi {
     appendEntry(customType: string, data: { name: string }): void {
       entries.push({ customType, data });
     },
+    async setModel(model: StubModel): Promise<boolean> {
+      modelCalls.push(`${model.provider}/${model.id}`);
+      if (options.setModelThrows === true) {
+        throw new Error("No API key for this model.");
+      }
+      if (options.acceptModel === false) {
+        return false;
+      }
+      session.model = model;
+      return true;
+    },
+    setThinkingLevel(level: ThinkingLevel): void {
+      thinkingLevelCalls.push(level);
+      session.thinkingLevel = level;
+    },
+    getThinkingLevel(): ThinkingLevel {
+      return session.thinkingLevel;
+    },
   };
 
-  return { api: api as unknown as ExtensionAPI, handlers, shortcuts, entries };
+  return {
+    api: api as unknown as ExtensionAPI,
+    handlers,
+    shortcuts,
+    entries,
+    session,
+    modelCalls,
+    thinkingLevelCalls,
+  };
 }
 
 interface RecordedStatus {
@@ -149,6 +247,15 @@ interface RecordedNotification {
   readonly type: string | undefined;
 }
 
+interface StubContextOptions {
+  readonly cwd: string;
+  readonly entries?: readonly SessionEntry[];
+  /** Shared with the API stub, so a press sees the model the last press set. */
+  readonly session?: StubSession;
+  /** `false` is a streaming response: the state the idle guard rejects. */
+  readonly idle?: boolean;
+}
+
 interface StubContext {
   readonly context: ExtensionContext;
   readonly statuses: RecordedStatus[];
@@ -157,16 +264,16 @@ interface StubContext {
 
 /**
  * A session context carrying only what the extension reads: the working directory,
- * the two UI calls and the session history. Same reason for the cast as above — the
- * real context also owns the model, the abort signal and a dozen more members.
+ * the two UI calls, the session history, the current model and the idle flag. Same
+ * reason for the cast as above — the real context also owns the abort signal and a
+ * dozen more members.
  */
-function createStubContext(options: {
-  readonly cwd: string;
-  readonly entries?: readonly SessionEntry[];
-}): StubContext {
+function createStubContext(options: StubContextOptions): StubContext {
   const statuses: RecordedStatus[] = [];
   const notifications: RecordedNotification[] = [];
   const entries = options.entries ?? [];
+  const session = options.session ?? createStubSession();
+  const idle = options.idle ?? true;
 
   const context = {
     cwd: options.cwd,
@@ -181,9 +288,52 @@ function createStubContext(options: {
     sessionManager: {
       getEntries: () => [...entries],
     },
+    // A getter, not a fixed value: the extension reads `ctx.model` to take the
+    // snapshot, and pi really has moved on after a `setModel`.
+    get model(): StubModel | undefined {
+      return session.model;
+    },
+    modelRegistry: {
+      getAvailable: () => [...AVAILABLE_MODELS],
+      find: (provider: string, modelId: string) =>
+        AVAILABLE_MODELS.find((model) => model.provider === provider && model.id === modelId),
+    },
+    isIdle: () => idle,
   };
 
   return { context: context as unknown as ExtensionContext, statuses, notifications };
+}
+
+interface StubPairOptions {
+  readonly entries?: readonly SessionEntry[];
+  /** `null` is a session that reached the handler before a model was resolved. */
+  readonly model?: StubModel | null;
+  readonly thinkingLevel?: ThinkingLevel;
+  readonly idle?: boolean;
+  readonly acceptModel?: boolean;
+  readonly setModelThrows?: boolean;
+}
+
+/**
+ * One API stub and one context stub over one shared session state, which is what a
+ * multi-press case needs: the second press has to see what the first one set.
+ */
+function createStubPair(
+  options: StubPairOptions = {},
+): { readonly stub: StubApi; readonly session: StubContext } {
+  const state = createStubSession({ model: options.model, thinkingLevel: options.thinkingLevel });
+  const stub = createStubApi({
+    session: state,
+    acceptModel: options.acceptModel,
+    setModelThrows: options.setModelThrows,
+  });
+  const session = createStubContext({
+    cwd: fixture.cwd,
+    entries: options.entries,
+    session: state,
+    idle: options.idle,
+  });
+  return { stub, session };
 }
 
 /** A complete normalized options object, so `strict` checks all twelve fields. */
@@ -232,12 +382,14 @@ function startSession(stub: StubApi, context: StubContext): void {
   requireHandler(stub, "session_start")({ type: "session_start", reason: "startup" }, context.context);
 }
 
-function pressShortcut(stub: StubApi, context: StubContext): void {
+function pressShortcut(stub: StubApi, context: StubContext): Promise<void> {
   const shortcut = stub.shortcuts[0];
   if (shortcut === undefined) {
     throw new Error("The extension registered no shortcut.");
   }
-  shortcut.handler(context.context);
+  // Returns the handler's promise: the press applies the agent before it resolves,
+  // so a case that asserts what the press changed has to await it.
+  return Promise.resolve(shortcut.handler(context.context));
 }
 
 /** Returns whatever the handler returned — `undefined` is part of the contract. */
@@ -269,7 +421,7 @@ it("shortcut is registered", () => {
   expect(stub.shortcuts[0].description).toBeTruthy();
 });
 
-it("press before session_start is a no-op", () => {
+it("press before session_start is a no-op", async () => {
   // GIVEN the extension wired against a stub API whose session has not started, so
   // no cycle has been built yet,
   const stub = createStubApi();
@@ -277,9 +429,10 @@ it("press before session_start is a no-op", () => {
   const session = createStubContext({ cwd: fixture.cwd });
 
   // WHEN the shortcut is pressed,
-  // THEN it does not throw: a keyboard handler that crashes pi mid-keypress is
-  // worse than one that waits for the session to arrive,
-  expect(() => pressShortcut(stub, session)).not.toThrow();
+  // THEN it does not throw — and does not reject, now that the handler is async: a
+  // keyboard handler that crashes pi mid-keypress is worse than one that waits for
+  // the session to arrive,
+  await expect(pressShortcut(stub, session)).resolves.toBeUndefined();
 
   // AND it leaves no trace — no entry recording a selection nobody made, and no
   // footer text naming a stop that does not exist:
@@ -287,7 +440,7 @@ it("press before session_start is a no-op", () => {
   expect(session.statuses).toEqual([]);
 });
 
-it("second session_start does not duplicate the cycle", () => {
+it("second session_start does not duplicate the cycle", async () => {
   // GIVEN two project agents and a session that has started, so the cycle is
   // `Main, alpha, zulu`,
   fixture.writeAgent("alpha", REVIEWER_PROMPT);
@@ -306,9 +459,9 @@ it("second session_start does not duplicate the cycle", () => {
   startSession(stub, session);
 
   // AND the shortcut is pressed three times,
-  pressShortcut(stub, session);
-  pressShortcut(stub, session);
-  pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
 
   // THEN the presses walk the rebuilt cycle exactly once: `alpha`, `mike`, `zulu`.
   // A cycle that had been appended to instead of rebuilt would read
@@ -342,14 +495,14 @@ it("skipped file surfaces a warning", () => {
   ]);
 });
 
-it("before_agent_start applies the current agent", () => {
+it("before_agent_start applies the current agent", async () => {
   // GIVEN one project agent and a session that has started on it,
   fixture.writeAgent("reviewer", REVIEWER_PROMPT);
   const stub = createStubApi();
   agentSwitch(stub.api);
   const session = createStubContext({ cwd: fixture.cwd });
   startSession(stub, session);
-  pressShortcut(stub, session);
+  await pressShortcut(stub, session);
 
   // WHEN the next message is about to be composed,
   const options = createPromptOptions();
@@ -362,7 +515,7 @@ it("before_agent_start applies the current agent", () => {
   expect(result).toBeUndefined();
 });
 
-it("footer shows the current name", () => {
+it("footer shows the current name", async () => {
   // GIVEN one project agent and a started session,
   fixture.writeAgent("reviewer", REVIEWER_PROMPT);
   const stub = createStubApi();
@@ -377,11 +530,11 @@ it("footer shows the current name", () => {
   expect(session.statuses).toEqual([{ key: "agent", text: MAIN_LABEL }]);
 
   // AND one press replaces the text with the agent's name, same key:
-  pressShortcut(stub, session);
+  await pressShortcut(stub, session);
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "reviewer" });
 });
 
-it("selection is persisted", () => {
+it("selection is persisted", async () => {
   // GIVEN one project agent and a started session,
   fixture.writeAgent("reviewer", REVIEWER_PROMPT);
   const stub = createStubApi();
@@ -390,7 +543,7 @@ it("selection is persisted", () => {
   startSession(stub, session);
 
   // WHEN the shortcut selects it,
-  pressShortcut(stub, session);
+  await pressShortcut(stub, session);
 
   // THEN the choice is written as this extension's `custom` entry, so a resume can
   // find it again:
@@ -434,4 +587,151 @@ it("missing agent falls back to Main", () => {
   expect(session.notifications).toEqual([
     expect.objectContaining({ type: "warning", message: expect.stringContaining("deleted-agent") }),
   ]);
+});
+
+it("cycle applies the agent's model and level", async () => {
+  // GIVEN one project agent naming a model and a level, and a started session,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  const { stub, session } = createStubPair();
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the shortcut selects it,
+  await pressShortcut(stub, session);
+
+  // THEN the handler wires the decision half: the model goes first, then the level
+  // pi clamps against that model — and the footer already names the new agent:
+  expect(stub.modelCalls).toEqual(["anthropic/claude-sonnet-4"]);
+  expect(stub.thinkingLevelCalls).toEqual(["high"]);
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "architect" });
+});
+
+it("Main restores the snapshot", async () => {
+  // GIVEN a session that starts on its own model and level, one agent that names a
+  // different model and level, and a started session,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  const { stub, session } = createStubPair();
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the cycle leaves `Main` and comes back to it,
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+
+  // THEN `Main` puts the starting model and level back: they were captured before
+  // the agent's values were applied, which is why the starting model is second and
+  // not first:
+  expect(stub.modelCalls).toEqual(["anthropic/claude-sonnet-4", "anthropic/claude-opus-4"]);
+  expect(stub.thinkingLevelCalls).toEqual(["high", "low"]);
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
+  expect(session.notifications).toEqual([]);
+});
+
+it("agents do not re-snapshot", async () => {
+  // GIVEN two agents that each name a model and a level, so the session's state
+  // moves twice before it returns to `Main`,
+  fixture.writeAgent("alpha", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  fixture.writeAgent("zulu", REVIEWER_PROMPT, { model: "acme/zulu-1", thinking: "max" });
+  const { stub, session } = createStubPair();
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the cycle walks `Main, alpha, zulu` and then back to `Main`,
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+
+  // THEN the third promise is the snapshot taken on the first press, not the state
+  // `alpha` left behind: moving between two agents does not move the target
+  // `Main` returns to. A fixture with a fixed model could not show this, which is
+  // why the stubs share a mutable session state.
+  expect(stub.modelCalls).toEqual([
+    "anthropic/claude-sonnet-4",
+    "acme/zulu-1",
+    "anthropic/claude-opus-4",
+  ]);
+  expect(stub.thinkingLevelCalls).toEqual(["high", "max", "low"]);
+});
+
+it("press while streaming changes nothing", async () => {
+  // GIVEN a started session whose response is still streaming,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  const { stub, session } = createStubPair({ idle: false });
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the shortcut is pressed mid-run,
+  await pressShortcut(stub, session);
+
+  // THEN nothing changes: no entry for a selection nobody made, the footer keeps
+  // the one text `session_start` wrote, no model and no level move, and one warning
+  // says why — a swap mid-run would let a response and its tool continuation run on
+  // two different models:
+  expect(stub.entries).toEqual([]);
+  expect(session.statuses).toEqual([{ key: "agent", text: MAIN_LABEL }]);
+  expect(stub.modelCalls).toEqual([]);
+  expect(stub.thinkingLevelCalls).toEqual([]);
+  expect(session.notifications).toEqual([
+    {
+      message: "A response is still streaming — the agent is switched once it is idle.",
+      type: "warning",
+    },
+  ]);
+});
+
+it("Main restore that throws warns instead of crashing", async () => {
+  // GIVEN an agent naming neither field, and a session whose starting model has
+  // lost its credentials by the time the cycle comes back to `Main` — `pi.setModel`
+  // throws for that instead of answering `false`,
+  fixture.writeAgent("plain", REVIEWER_PROMPT);
+  const { stub, session } = createStubPair({ setModelThrows: true });
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the cycle leaves `Main` — no `setModel` on that press, so the throw below
+  // belongs to the restore alone — and comes back to it,
+  await pressShortcut(stub, session);
+  await expect(pressShortcut(stub, session)).resolves.toBeUndefined();
+
+  // THEN the throw becomes a warning naming the model instead of an exception out
+  // of a keypress, and the level is restored anyway (the two fields fall back
+  // independently, exactly as in `applySelection`):
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
+  expect(session.notifications).toHaveLength(1);
+  expect(session.notifications[0]).toEqual({
+    type: "warning",
+    message: expect.stringContaining("anthropic/claude-opus-4"),
+  });
+  expect(stub.thinkingLevelCalls).toEqual(["low"]);
+});
+
+it("snapshot without a model still restores the level", async () => {
+  // GIVEN a session that reached the first press before a model was resolved, and
+  // an agent that names a level,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, { thinking: "high" });
+  const { stub, session } = createStubPair({ model: null });
+  agentSwitch(stub.api);
+  startSession(stub, session);
+
+  // WHEN the cycle leaves `Main` and comes back to it,
+  await pressShortcut(stub, session);
+  await pressShortcut(stub, session);
+
+  // THEN the restore skips the model silently — there is nothing to put back, and
+  // absence is not a failure — and still restores the level:
+  expect(stub.modelCalls).toEqual([]);
+  expect(stub.thinkingLevelCalls).toEqual(["high", "low"]);
+  expect(session.notifications).toEqual([]);
 });

@@ -104,11 +104,16 @@ export async function applySelection<M extends ModelRef>(
 
 /** The model half: absent is silent, unusable is a warning. */
 async function applyModel<M extends ModelRef>(agent: AgentDefinition, deps: SelectionDeps<M>): Promise<boolean> {
-  const reference = agent.model;
-  if (reference === undefined || reference.trim() === "") {
+  const configured = agent.model;
+  if (configured === undefined || configured.trim() === "") {
     // Absence is normal — most agent files name no model — so it must not warn.
     return false;
   }
+
+  // The trimmed form is what `resolveModel` matched, so it is also what the
+  // operator must see: a warning quoting stray spaces sends them hunting for a
+  // difference that is not there.
+  const reference = configured.trim();
 
   const model = resolveModel(reference, deps.available);
   if (model === undefined) {
