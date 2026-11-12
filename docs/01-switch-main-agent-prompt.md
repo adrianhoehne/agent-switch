@@ -493,6 +493,7 @@ Gate: open.
 | Stage 1 committed: `.gitignore` added by the orchestrator (no behavioural effect); `skipLibCheck: true` and `target: es2023` in `tsconfig.json` accepted as necessary | code review round 1 + 2 | 2026-11-12 |
 | `enabled: false` agents stay in the loader result; the cycle filters them (stage 3) | code review round 1, accepted | 2026-11-12 |
 | Symlink rejection added beyond the original skip list | code review round 1 | 2026-11-12 |
+| Stage 2 committed: criteria 3, 4, 5 asserted; three follow-ups logged (empty-body case, reference comparison, trim twice) | code review, `✅` | 2026-11-12 |
 | `applyAgentToPromptOptions` takes `AgentDefinition \| null` for `Main`; `loadAgents` gains an optional `options` argument | architect, accepted by orchestrator | 2026-11-12 |
 | The `AGENTS.md` acceptance block is edited by the orchestrator, not the implementer | orchestrator | 2026-11-12 |
 | `Key` is not re-exported by `pi-coding-agent`; the shortcut uses the literal `"ctrl+shift+a"`, so `pi-tui` stays out | architect | 2026-11-12 |
