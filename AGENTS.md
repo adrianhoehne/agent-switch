@@ -85,8 +85,8 @@ A report is a report, not proof: nothing is accepted on prose.
 Before every commit:
 
 ```bash
-# none yet — no acceptance command exists; the increment that adds the first
-# TypeScript test names its exact command here and in the spec
+npm run typecheck
+npm test
 ```
 
 No commit without green acceptance **and** without `✅` from step 6.
@@ -126,11 +126,6 @@ No commit without green acceptance **and** without `✅` from step 6.
 These points were not settled when this file was written. Until they are answered,
 they are not decided — do not fill them in silently.
 
-- **Acceptance command.** The operator announced TypeScript tests but named no
-  command, and no test exists yet. The increment that adds the first test names the
-  exact command under `## Acceptance`.
-- **Git repository.** `/home/adrian/agent-switch` is not under version control.
-  Step 6 (`git diff <base>`) cannot run until the operator runs `git init`.
 - **`docs/PROJECT-STATE.md`.** Not requested. Create it only if the operator asks;
   from then on it travels with every increment commit.
 - **Project-specific rules** (operating limits, data directories, banned tools,
