@@ -89,7 +89,7 @@ export function applySelection<M extends ModelRef>(
 | # | Criterion | Command / evidence |
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
-| 2 | The suite passes with 53 cases: the 35 existing names unchanged plus 18 new ones | `npm test` exits 0 and its summary reads `Tests  53 passed (53)` |
+| 2 | The suite passes with 53 cases: the 35 existing names unchanged plus 18 new ones | `npm test` exits 0 and its summary reads `Tests  53 passed (53)`. Under root the `it.skipIf` case skips, so the summary reads `52 passed | 1 skipped` |
 | 3 | `model` and `thinking` are parsed; an unknown level leaves the field unset | cases `parses model and thinking`, `unknown thinking level is left unset` |
 | 4 | `provider/id` resolves exactly; a bare id resolves against the available models; an unknown reference resolves to `undefined` | cases `resolves provider and id`, `resolves a bare model id`, `unknown model resolves to nothing` |
 | 5 | An agent with no fields changes nothing | case `no fields leaves model and thinking alone` asserts neither setter was called |
@@ -204,8 +204,8 @@ are recorded in `## Log`.
    - `agent === null`, or an agent with neither field, touches nothing and warns nothing.
    - "Never throws" is part of the contract: `try`/`catch` around both setters turns a
      throw into a warning and `…Applied: false`.
-   Tests: the eight from the spec's table plus `a throwing setter warns instead of
-   crashing`. The one case needing an out-of-union level casts with
+   Tests: the nine the spec's `## Testing` table lists for this file, the throwing setter
+   among them. The one case needing an out-of-union level casts with
    `"ultra" as ThinkingLevel`, because `agents.ts` already drops it — this guard is the
    second line of defence.
    Proof: `npx vitest run test/apply.test.ts` exits 0 with 9 cases.
@@ -343,30 +343,13 @@ the same increment, as 02 and 03 did:
 | frontmatter `description` and `## Goal` | **stay as they are**: 01's subject is still the prompt swap; model and thinking are additive and are documented here |
 | `docs/03-shift-tab-shortcut.md`, `## Non-goals` | "No change to how thinking levels are set … beyond releasing the key" stops holding the moment this ships |
 
-Proof after the amendment: `grep -n 'model.*thinking' docs/01-switch-main-agent-prompt.md`
-returns only its `## Log` row, which is history; `docs/03` no longer carries the non-goal
-sentence. This section is
+Proof after the amendment: `grep -n 'of the agent file are not adopted\|Not\*\* adopting' docs/01-switch-main-agent-prompt.md`
+prints nothing, and `grep -n 'beyond releasing the key' docs/03-shift-tab-shortcut.md` prints
+nothing. A grep on `model.*thinking` would also match the rewritten `src/agents.ts` row, so
+it cannot decide the amendment. This section is
 removed at step 7, when 01 is amended.
 
 ## Review
-
-**2026-11-12 — spec review, round 2 — 🔧 Fix these and I'll sign off — blockers: yes (1).**
-
-Four of the five round-1 blockers landed: the amendments list covers all four
-`model.*thinking` lines in `docs/01` (34, 254, 415, 493) plus `docs/03`'s non-goal,
-`restoreMain` catches, the undefined-model rule is written, and the twelve criteria end on
-the operator's live check.
-
-Blocking: the same arithmetic, one case later — `## Testing` named a new extension case
-that no stage built, so the plan reached 51 while the table implied 52.
-
-Non-blocking, applied: the undefined-model branch got its own case; the amendment proof no
-longer expects a line that will not be there; `docs/01`'s frontmatter and Goal are recorded
-as deliberately unchanged; stage 4 names `startSession`; stage 2 counts one cast, not two;
-`## Known gaps` is dated.
-
-Round 2 outcome: blocker and all notes applied. Totals recomputed: 35 + 2 + 9 + 6 + 1 =
-53, with 18 new cases.
 
 **2026-11-12 — spec review, round 1 — 🔧 Fix these and I'll sign off — blockers: yes (5).**
 
@@ -391,6 +374,38 @@ throwing-setter and restore-throw cases are in `## Testing`; criterion 2 is pinn
 `Tests  51 passed (51)`.
 
 Round 1 outcome: all five blockers and all four notes applied.
+
+**2026-11-12 — spec review, round 2 — 🔧 Fix these and I'll sign off — blockers: yes (1).**
+
+Four of the five round-1 blockers landed: the amendments list covers all four
+`model.*thinking` lines in `docs/01` (34, 254, 415, 493) plus `docs/03`'s non-goal,
+`restoreMain` catches, the undefined-model rule is written, and the twelve criteria end on
+the operator's live check.
+
+Blocking: the same arithmetic, one case later — `## Testing` named a new extension case
+that no stage built, so the plan reached 51 while the table implied 52.
+
+Non-blocking, applied: the undefined-model branch got its own case; the amendment proof no
+longer expects a line that will not be there; `docs/01`'s frontmatter and Goal are recorded
+as deliberately unchanged; stage 4 names `startSession`; stage 2 counts one cast, not two;
+`## Known gaps` is dated.
+
+Round 2 outcome: blocker and all notes applied. Totals recomputed: 35 + 2 + 9 + 6 + 1 =
+53, with 18 new cases.
+
+**2026-11-12 — spec review, round 3 — ✅ Ship it — blockers: no.**
+
+Re-verified by running: `agents` 14, `extension` 9, `prompt` 5, `state` 7 = 35, and
+`npm test` prints `Tests  35 passed (35)`, so `Tests  53 passed (53)` is the right string.
+The stages multiply out (16 + 9 + 16 + 5 + 7 = 53, i.e. 18 new), the case map is closed in
+both directions, review blocks are chronological, criteria run 1–12, and every amendment
+target exists.
+
+Follow-ups, applied: the step-7 proof now greps the old claim instead of `model.*thinking`,
+which would match the rewritten `src/agents.ts` row; criterion 2 notes the root caveat
+(`52 passed | 1 skipped`); stage 2 counts the nine table cases rather than eight.
+
+Gate: open.
 
 ## Log
 
