@@ -23,6 +23,7 @@ restores the model and thinking level the session began with.
 | Resume | the restored selection is applied again at `session_start`; if it cannot be applied, the current value stays |
 | Model and thinking | independent fields, independent fallbacks; the model is set first, because pi clamps the thinking level against the model |
 | Failure | `ctx.ui.notify(..., "warning")`, naming the field and the value |
+| Press while streaming | rejected: nothing changes, one warning. A model swap mid-run would let a response and its tool continuation run on different models |
 | Model syntax | `provider/modelId` resolves exactly; a bare `modelId` matches an available model by id; anything else is unusable |
 | Unknown level | a `thinking` value outside `off, minimal, low, medium, high, xhigh, max` is unusable, not clamped by us |
 
@@ -97,9 +98,10 @@ export function applySelection<M extends ModelRef>(
 | 8 | `setModel` returning `false` keeps the current model and warns | case `refused model keeps the current one and warns` |
 | 9 | `Main` restores the snapshot; the snapshot is taken on the first exit only | cases `Main restores the snapshot`, `agents do not re-snapshot` |
 | 10 | A resumed selection is applied again at `session_start` | case `resume applies the selection again` |
-| 11 | Live: `architect` carries `thinking: high` today; cycling to it shows `high` in the footer, cycling back to `Main` shows the level the session started with | operator, `pi --extension ./src/extension.ts` |
+| 11 | A press while a response streams changes nothing and warns once | case `press while streaming changes nothing` asserts no entry, no status, no `setModel` and one warning |
+| 12 | Live: `architect` carries `thinking: high` today; cycling to it shows `high` in the footer, cycling back to `Main` shows the level the session started with | operator, `pi --extension ./src/extension.ts` |
 
-Criterion 11 is the operator's. Criteria 1–10 decide the commit.
+Criterion 12 is the operator's. Criteria 1–11 decide the commit.
 
 ## Testing
 
@@ -119,6 +121,7 @@ Criterion 11 is the operator's. Criteria 1–10 decide the commit.
 | | `Main restores the snapshot` | Main is the initial state |
 | | `agents do not re-snapshot` | the snapshot is taken once, on the first exit |
 | | `resume applies the selection again` | a resumed label is not just a name |
+| | `press while streaming changes nothing` | the guard: no entry, no status, no model change, one warning |
 
 ## Risks and alternatives
 
@@ -168,7 +171,148 @@ are recorded in `## Log`.
 
 ## Dev plan
 
-(pending — filled by the architect in step 3 of the loop)
+1. **Parse the two fields** — `src/agents.ts` and `test/agents.test.ts`.
+   Add `export const THINKING_LEVELS = ["off","minimal","low","medium","high","xhigh","max"] as const;`
+   and `export type ThinkingLevel = (typeof THINKING_LEVELS)[number];` above
+   `AgentDefinition` (they describe a frontmatter field, so `apply.ts` imports the type
+   from `./agents`; no cycle, since `agents.ts` never imports `apply.ts`). Extend
+   `AgentDefinition` with `model?: string` and `thinking?: ThinkingLevel`, filled in
+   `readAgentFile` next to `promptMode`: `model` from `readString(frontmatter, "model")`,
+   `thinking` through `readThinkingLevel(frontmatter)` which returns `undefined` for
+   anything outside `THINKING_LEVELS`. Reuse the "a wrong type is a missing field"
+   convention — it also covers YAML turning an unquoted `thinking: off` into `false`.
+   Do not touch `loadAgents`, the skip rules, `findFileProblem` or any other key.
+   Tests: `parses model and thinking`, `unknown thinking level is left unset`.
+   Proof: `npx vitest run test/agents.test.ts` exits 0 with 15 cases; `npm run typecheck`
+   exits 0 — the type check is the real guard here, because the existing cases compare
+   fields one by one and added optional keys cannot break them.
+
+2. **The decision half** — new `src/apply.ts` and `test/apply.test.ts`.
+   `src/apply.ts` imports **types only** (`import type { AgentDefinition, ThinkingLevel }
+   from "./agents"`), so it runs without a pi session. Contents as in the spec's
+   interface block. Decisions to write down in comments:
+   - `resolveModel` splits at the **first** `/` (provider ids carry none, model ids do:
+     `meta-llama/llama-3.1-70b` must survive as an id). Without a `/` it matches
+     `available` by `id`, first match wins.
+   - `applySelection` sets the model first, then the level, and the two fallbacks are
+     independent. Every rejection calls `deps.warn` naming field, value and agent, e.g.
+     `Agent "architect": model "nope/model" is not available — keeping the current model.`
+   - `agent === null`, or an agent with neither field, touches nothing and warns nothing.
+   - "Never throws" is part of the contract: `try`/`catch` around both setters turns a
+     throw into a warning and `…Applied: false`.
+   Tests: the eight from the spec's table plus `a throwing setter warns instead of
+   crashing`. The two cases needing an out-of-union level cast with
+   `"ultra" as ThinkingLevel`, because `agents.ts` already drops it — this guard is the
+   second line of defence.
+   Proof: `npx vitest run test/apply.test.ts` exits 0 with 9 cases.
+
+3. **Handler path: guard, snapshot, apply, restore** — `src/extension.ts` and
+   `test/extension.test.ts`.
+   - `type AvailableModel = ReturnType<ExtensionContext["modelRegistry"]["getAvailable"]>[number];`
+     and `type MainState = { readonly model: ExtensionContext["model"]; readonly thinking: ThinkingLevel };`
+     — spelled from the context type, so no `Model`/`ThinkingLevel` import from pi packages.
+   - `function selectionDeps(ctx): SelectionDeps<AvailableModel>` returning `available`,
+     `setModel`, `setThinkingLevel`, `warn` (→ `ctx.ui.notify(message, "warning")`). Built
+     per call, never cached: `ctx` differs between `session_start` and the handler.
+   - `let mainSnapshot: MainState | null = null;` in the factory closure.
+   - `async function restoreMain(snapshot, deps)`: `null` → nothing; model first, `false` →
+     warn naming provider/id; then `setThinkingLevel`. It calls `deps` directly because the
+     snapshot holds a `Model`, not a reference string.
+   - The shortcut handler becomes `async (ctx)` and keeps its order, with two insertions:
+     after the `cycle.length === 0` guard, `if (!ctx.isIdle()) { ctx.ui.notify("A response
+     is still streaming — the agent is switched once it is idle.", "warning"); return; }`;
+     and `const previousLabel = currentLabel;` before `nextLabel`, then on
+     `previousLabel === MAIN_LABEL && mainSnapshot === null` capture
+     `{ model: ctx.model, thinking: pi.getThinkingLevel() }`. `pi.getThinkingLevel()`, not
+     `ctx.thinkingLevel` (optional). Then `appendEntry`, `setLabel`, and
+     `await (selectedAgent() === null ? restoreMain(mainSnapshot, deps) : applySelection(agent, deps))`.
+   - **Capture only here, never in `session_start`.** pi persists the session model in the
+     transcript, so at a resumed `session_start` `ctx.model` is already the agent's model.
+     One capture site makes that trap structurally impossible.
+   - Test fixture work: `createStubApi` gains `setModel` (records, configurable boolean),
+     `setThinkingLevel` (records), `getThinkingLevel`; `createStubContext` gains `model`,
+     `modelRegistry: { getAvailable, find }` and `isIdle: () => true`. `pressShortcut`
+     returns the handler's promise; the nine existing cases gain `await` — names, givens
+     and assertions unchanged, the `await` is mechanical. `writeAgent` gains an optional
+     third parameter for frontmatter fields.
+   - New cases: `cycle applies the agent's model and level`, `Main restores the snapshot`,
+     `agents do not re-snapshot`, `press while streaming changes nothing`.
+   Proof: `npx vitest run test/extension.test.ts` exits 0 with 13 cases.
+
+4. **Re-apply a resumed selection** — `src/extension.ts` and `test/extension.test.ts`.
+   Make the `session_start` handler `async`; after `cycle = loadCycle(ctx)`,
+   `restoreSelection`, `currentLabel`, the missing-label warning and `setLabel`, add
+   `if (currentLabel !== MAIN_LABEL) await applySelection(selectedAgent(), deps);` with a
+   comment that this is the one place the extension applies without a keypress, and why it
+   can never capture the snapshot (no capture statement exists in this handler).
+   `startSession` returns the handler's promise and the nine existing cases gain `await`.
+   New case `resume applies the selection again`: a state entry for an agent carrying
+   `model: anthropic/claude-sonnet-4` and `thinking: high`; `session_start` records both
+   setters. Also assert that a subsequent press to `Main` applies nothing
+   (`mainSnapshot` is still `null`) — that pins the in-memory limit instead of leaving it
+   to be discovered.
+   Proof: `npx vitest run test/extension.test.ts` exits 0 with 14 cases; `npm run
+   typecheck` exits 0; `npm test` exits 0 and its summary reads `Tests  50 passed (50)`.
+
+5. **Not implementer work — the `docs/01` amendment (orchestrator, step 7).** The five
+   places under `## Amendments to previous spec docs` are edited in this increment.
+   Proof: `grep -n 'model.*thinking' docs/01-switch-main-agent-prompt.md` no longer reports
+   a passage claiming the two fields are not adopted; its `## Log` rows stay as history.
+
+6. **Not implementer work — criterion 12 (operator).** `pi --extension ./src/extension.ts`,
+   cycle to `architect` (`thinking: high`), press on and back to `Main`. Needs a real
+   terminal, real API keys and a real session, which `AGENTS.md` keeps out of agent hands.
+
+### What could go wrong
+
+- **The `await` conversion looks like churn.** Nine existing extension cases and two
+  helpers gain `await`; nothing else in them may change. If an assertion has to be
+  rewritten, the wiring is wrong, not the test.
+- **Capturing the snapshot in `session_start` is the trap.** It compiles, it passes
+  `Main restores the snapshot`, and it quietly makes `Main` restore the *agent's* model
+  after a resume. Stage 4's second assertion exists to catch this.
+- **The idle guard changes visible behaviour.** A press while pi streams used to flip the
+  label and now only warns. Intended, and now covered by criterion 11 — do not read the
+  warning in a live session as a bug.
+- **A missing snapshot on a resumed session is not a failure.** `Main` then applies
+  nothing and does not warn: absence is normal, and the snapshot is deliberately not
+  persisted (spec `## Known gaps`). Do not "fix" it with a warning.
+- **`restoreMain` duplicates five lines of `applySelection`.** Deliberate and bounded:
+  same order, same `false` → warn rule. One code path would need a third export in the
+  spec's interface, which only the orchestrator may change.
+- **Do not resolve the snapshot's model back through a reference string.** It adds a
+  `getAvailable()` round trip and fails with a spurious warning on a scoped model list.
+- **`ctx.isIdle()` is a runtime member** (`dist/core/extensions/types.d.ts`): if the stub
+  omits it the case fails at runtime, not at typecheck, because the fixture casts.
+- **No new dependency, no `Model`/`ThinkingLevel` import from pi**: both types live in
+  packages that are not dependencies of this one.
+
+### Ordering and dependencies
+
+Strictly 1 → 2 → 3 → 4. Stage 1 must precede 3 and 4 (the fields must exist), stage 2 must
+precede 3 (`selectionDeps` implements `SelectionDeps`). No stage depends on a later one;
+each leaves the suite green. Stages 5 and 6 follow the commit of 4; criterion 12 is the
+operator's, after 5.
+
+### What the next increment inherits
+
+- **The snapshot does not survive a new process** — see `## Known gaps`; making it durable
+  is its own spec.
+- **Bare-id resolution is first-match-wins** across providers; a tie rule is unbuilt.
+- **`thinking` is not validated against the model**; pi clamps, and we do not
+  second-guess it.
+- **`tools`, `extensions`, `skills` in an agent file stay ignored**, as do package-tier
+  agents and any `/agent` command.
+- `docs/README.md`'s `Status` column and the flip of `04` to `active` are the
+  orchestrator's, in step 7.
+
+## Known gaps
+
+| Gap | Why it stays open |
+|---|---|
+| The snapshot is in memory, not in the session | after a reload or resume of a session that was on an agent, `Main` applies nothing because there is no snapshot. Persisting it means a stored entry, a reader in `state.ts` and a decision about what "starting state" means for a resumed session — its own spec |
+| A bare model id resolves first-match-wins | `getAvailable()` order decides; a tie rule (scoped models first, or a warning on ambiguity) is unbuilt |
+| `thinking` is not checked against the chosen model | pi clamps an unsupported level and the footer shows the effective value; warning about a clamp is not part of this increment |
 
 ## Amendments to previous spec docs
 
@@ -201,3 +345,5 @@ removed at step 7, when 01 is amended.
 | Model and thinking fall back independently (simpler: two fields, two fallbacks) | operator asked which is simpler; orchestrator chose independent | 2026-11-12 |
 | A failure is reported with `ctx.ui.notify` as a warning | operator | 2026-11-12 |
 | Changing the model mid-conversation can force a compaction — accepted, same as switching by hand | operator | 2026-11-12 |
+| A press while a response streams is rejected with a warning instead of switching mid-run | operator | 2026-11-12 |
+| The 35 existing cases are confirmed by counting `it(` (agents 14, extension 9, prompt 5, state 7); a dev-plan doubt about the number was unfounded | orchestrator | 2026-11-12 |
