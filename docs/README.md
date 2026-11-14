@@ -65,5 +65,9 @@ down in [`AGENTS.md`](../AGENTS.md).
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.
 
+[`ROADMAP.md`](ROADMAP.md) is not a spec: it tracks what is still missing, what each
+item changes for the user and whether it is open or decided. It carries no frontmatter
+and no `Status` of its own.
+
 The meta file of this folder (`README.md`) deliberately carries no frontmatter: it
 is process, not a spec.
