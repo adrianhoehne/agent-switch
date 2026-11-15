@@ -23,7 +23,8 @@ State values: **open** (needs work), **question** (needs a decision first),
 | Item | What it changes for the user | State | Source |
 |---|---|---|---|
 | `/agent <name>` slash command | jump to an agent by name instead of pressing `shift+tab` until the footer matches; also works in terminals that do not send `shift+tab` | open | Non-goals, `docs/01` and `docs/03` |
-| A configurable shortcut (CLI flag or settings key) | `shift+tab` stops being a hard-coded decision | open | Non-goals, `docs/03` |
+| A configurable shortcut instead of the hard-coded `shift+tab` | a key that the terminal, tmux or another tool already owns stops being a dead end. Today the only workaround is rewriting the global `~/.pi/agent/keybindings.json`, because pi refuses an extension key that a built-in owns; the release ships that file as an asset, which makes it copyable but not configurable | open | Non-goals, `docs/03`; sharpened 2026-11-15 after the release published the keybinding file |
+| Which key, and where the setting lives | the item above cannot start until three things are decided: the default key, whether the setting is a pi settings key, a CLI flag or a field in the agent file, and what happens when the chosen key is reserved again. Today a reserved key is not a crash, it is a shortcut that does not exist, with one line in pi's `[Extension issues]` startup block as its only trace | **question** | not recorded anywhere; `docs/03` `## Risks and alternatives` describes the same failure for `shift+tab` |
 | A picker dialog | see descriptions and land on an agent in one step | **question** — the operator chose cycling deliberately; is a picker wanted later | Non-goals, `docs/01` |
 
 ## 4. Adopting more of the agent file
