@@ -22,7 +22,7 @@ transcript is never rewritten.
 Release install — for anyone who is not the author:
 
 ```bash
-pi install git:github.com/adrianhoehne/agent-switch@v0.1.0
+pi install git:github.com/adrianhoehne/agent-switch@v0.1.1
 ```
 
 Personal install — the extension loads in every pi session:
@@ -64,7 +64,7 @@ The file is in the repository as [`keybindings.json`](keybindings.json) and atta
 the release, so it can be copied instead of typed:
 
 ```bash
-curl -fsSL https://github.com/adrianhoehne/agent-switch/releases/download/v0.1.0/keybindings.json \
+curl -fsSL https://github.com/adrianhoehne/agent-switch/releases/download/v0.1.1/keybindings.json \
   -o ~/.pi/agent/keybindings.json
 ```
 
@@ -182,7 +182,7 @@ The behaviour is specified in `docs/`; start with `docs/README.md` for the forma
 
 ## Status
 
-Version 0.1.0, MIT, and the repository is public at
+Version 0.1.1, MIT, and the repository is public at
 [github.com/adrianhoehne/agent-switch](https://github.com/adrianhoehne/agent-switch). The
 extension installs from the git URL above or from a local path.
 
