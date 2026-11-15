@@ -1,6 +1,6 @@
 ---
 description: Publishes the packaged plugin on GitHub — scrubs the workstation path and the private mail address, untracks the workstation files, rewrites the commit identity, pushes, waits for green CI and tags v0.1.0.
-status: proposed
+status: active
 ---
 
 # 06 — Publish on GitHub
@@ -8,6 +8,10 @@ status: proposed
 Proposed on 2026-11-15. This spec was split out of an earlier, larger release spec in its
 round-3 review (`AGENTS.md` step 4). It starts when `docs/05-release-packaging.md` is
 implemented and committed.
+
+Implemented on 2026-11-15. Criteria 1–10 are verified: the repository is public, `master`
+carries 31 commits under the noreply identity, and the first CI run is green. The tag and
+the release are the next step and criterion 11 decides them.
 
 ## Goal
 
@@ -519,3 +523,8 @@ tree must be clean when the rewrite runs.
 | 2026-11-15 | release: criterion 6 | `npm run typecheck` exits 0; `npm test` prints `Tests  58 passed (58)` |
 | 2026-11-15 | release: criterion 7 | checked immediately after the release commit; recorded here by the evidence commit, because it reads `HEAD` |
 | 2026-11-15 | release: commit identity | `user.email` is the noreply address repository-locally; `~/.gitconfig` untouched |
+| 2026-11-15 | release: criterion 7 | `git show --name-only --format= HEAD \| grep -vE "^(docs/\|\.gitignore$\|AGENTS\.md$\|\.pi/agents/architect\.md$\|$)"` printed nothing against the release commit |
+| 2026-11-15 | release: criterion 8 | `git log --format='%ae %ce' \| sort -u` prints one line, the noreply address on both fields; `git log --format='%B' \| grep -ciE "@(gmail\|googlemail)\."` prints 0 |
+| 2026-11-15 | release: criterion 9 | `diff /tmp/agent-switch-trees-before.txt /tmp/agent-switch-trees-after.txt` printed nothing for all 31 commits (`%T %ad %cd %s`); the tree hash `87d5c0c33a91cc0ed63c8f08daa420610feedd53` is unchanged before and after the rewrite; 31 commits before, 31 after; backup ref deleted, reflog expired, `gc --prune=now` |
+| 2026-11-15 | release: criterion 10 | first run on `master` — `CI`, run 43745322583, commit `6d942ef`, conclusion `success` |
+| 2026-11-15 | release: push route | SSH was refused (`Permission denied (publickey)`); `gh auth setup-git` and the HTTPS remote pushed `master` |
