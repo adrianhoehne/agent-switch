@@ -9,9 +9,10 @@ Proposed on 2026-11-15. This spec was split out of an earlier, larger release sp
 round-3 review (`AGENTS.md` step 4). It starts when `docs/05-release-packaging.md` is
 implemented and committed.
 
-Implemented on 2026-11-15. Criteria 1–10 are verified: the repository is public, `master`
-carries 31 commits under the noreply identity, and the first CI run is green. The tag and
-the release are the next step and criterion 11 decides them.
+Implemented on 2026-11-15. All twelve criteria are verified: the repository is public,
+`master` carries the commits under the noreply identity, CI is green, `v0.1.0` and `v0.1.1`
+are tagged and released with the keybinding file as an asset, and the operator's live
+install works — the footer switches from `Main` to an agent name on `shift+tab`.
 
 ## Goal
 
@@ -528,3 +529,5 @@ tree must be clean when the rewrite runs.
 | 2026-11-15 | release: criterion 9 | `diff /tmp/agent-switch-trees-before.txt /tmp/agent-switch-trees-after.txt` printed nothing for all 31 commits (`%T %ad %cd %s`); the tree hash `87d5c0c33a91cc0ed63c8f08daa420610feedd53` is unchanged before and after the rewrite; 31 commits before, 31 after; backup ref deleted, reflog expired, `gc --prune=now` |
 | 2026-11-15 | release: criterion 10 | first run on `master` — `CI`, run 43745322583, commit `6d942ef`, conclusion `success` |
 | 2026-11-15 | release: push route | SSH was refused (`Permission denied (publickey)`); `gh auth setup-git` and the HTTPS remote pushed `master` |
+| 2026-11-15 | release: criterion 11 | `v0.1.0` and `v0.1.1` exist as annotated tags, each with a release; `gh repo view` reports `PUBLIC`; both tag objects carry the noreply tagger; no tag started a CI run (run count equal before and after each tag push) |
+| 2026-11-15 | release: criterion 12 | operator, 2026-11-15: installed from the git URL, `pi list` shows the package, `shift+tab` changes the footer from `Main` to an agent name. The increment is closed |
