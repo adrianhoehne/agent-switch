@@ -1,8 +1,9 @@
 # Docs — specifications for agent-switch
 
 This project is run **spec-driven**: the specification describes the intended
-behaviour, the code implements it, the test runs prove both. The process is written
-down in [`AGENTS.md`](../AGENTS.md).
+behaviour, the code implements it, the test runs prove both. The process document that
+came out of that work (`AGENTS.md`) belongs to the author's working copy and is not part
+of this repository; what a reader needs from it is the format below.
 
 ## Format
 
@@ -62,6 +63,7 @@ down in [`AGENTS.md`](../AGENTS.md).
 | [`03-shift-tab-shortcut.md`](03-shift-tab-shortcut.md) | Moves the cycle from `ctrl+shift+a` to `shift+tab` and releases that key from pi's thinking cycle | active |
 | [`04-agent-model-and-thinking.md`](04-agent-model-and-thinking.md) | Adopts an agent's optional `model` and `thinking`, falling back per field, and restores the session's start on `Main` | active |
 | [`05-release-packaging.md`](05-release-packaging.md) | Prepares the plugin for a public release: MIT licence, release metadata, a manifest guard test, a CI workflow and a README that names the install | active |
+| [`06-publish-on-github.md`](06-publish-on-github.md) | Publishes the packaged plugin on GitHub: docs scrub, workstation files out of the index, commit-identity rewrite, push, CI, tag `v0.1.0` | proposed |
 
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.

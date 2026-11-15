@@ -11,8 +11,6 @@ State values: **open** (needs work), **question** (needs a decision first),
 
 | Item | What it changes for the user | State | Source |
 |---|---|---|---|
-| `package.json` metadata: `description`, `keywords: ["pi-package"]`, real `version` | the plugin becomes installable from npm instead of only from a path or a git URL | open | README → Status |
-| A licence | without one the package cannot be published at all | **question** — which licence | not recorded anywhere |
 
 ## 2. The one visible gap in daily use
 
@@ -66,10 +64,11 @@ State values: **open** (needs work), **question** (needs a decision first),
 | Move the cycle to `shift+tab` and release it from the thinking cycle | `docs/03-shift-tab-shortcut.md` |
 | Adopt an agent's optional `model` and `thinking`, restore the session's start on `Main` | `docs/04-agent-model-and-thinking.md` |
 | README, personal install, the keybinding prerequisite documented | `README.md` |
+| Release metadata and an MIT licence: version `0.1.0`, `description`, `keywords: ["pi-package"]`, `engines`, `files`, CI workflow, 58 test cases — shipped 2026-11-15 | `docs/05-release-packaging.md` |
 
 ## Suggested order
 
-1. Distribution (§1) — smallest change, makes the plugin shareable.
+1. Distribution (§1) — shipped on 2026-11-15 in `docs/05-release-packaging.md` and [`06-publish-on-github.md`](06-publish-on-github.md).
 2. `/agent <name>` (§3) — the largest everyday gap.
 3. Persist the starting state (§2) — the only gap that shows up in normal use.
 4. Package tier (§4) — no effect today, because no installed package declares an agent.

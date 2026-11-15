@@ -212,7 +212,7 @@ call still works" is part of the manual check.
 
 ## Touch boundary
 
-- Everything inside `/home/adrian/agent-switch`.
+- Everything inside `<project root>`.
 - **Not** `~/.pi/agent/**` and not `~/.agents/**` — agent files are read, never
   written; settings and keybindings are not edited.
 - **Not** generated folders: `node_modules/`, `coverage/`, `dist/`.

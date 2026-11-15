@@ -50,7 +50,7 @@ stay exactly as they are; only the key differs.
 |---|---|---|
 | 1 | Type check passes | `npm run typecheck` exits 0 |
 | 2 | The suite passes with 35 cases and the shortcut case asserts the new key | `npm test` exits 0 and prints `Tests  35 passed (35)`; `grep -n '"shift+tab"' test/extension.test.ts` shows the literal in `shortcut is registered`, because vitest prints case names, not assertion values |
-| 3 | The thinking key is released | `node -e 'console.log(require("/home/adrian/.pi/agent/keybindings.json"))'` prints `{ 'app.thinking.cycle': [] }` |
+| 3 | The thinking key is released | `node -e 'console.log(require(process.env.HOME + "/.pi/agent/keybindings.json"))'` prints `{ 'app.thinking.cycle': [] }` |
 | 4 | pi loads the extension with the key | a fresh `pi --extension ./src/extension.ts` shows no shortcut conflict in the `[Extension issues]` startup block (that is where `getShortcuts()` reports it; stdout carries it only in a UI-less run), and `/hotkeys` lists `Shift+Tab` under **Extensions** |
 | 5 | The key cycles the agent | live session: footer `Main` → first press `architect` → further presses onward |
 | 6 | Thinking is still controllable | in the same session `/thinking high` sets the level; the `Thinking level: high` status line confirms it, and the footer's thinking segment as well when the model supports reasoning |
@@ -135,13 +135,13 @@ with the operator on 2026-11-12.
 
 2. **Create `~/.pi/agent/keybindings.json` — orchestrator work, not the implementer's.**
    Content is exactly `{ "app.thinking.cycle": [] }`. Reason for the split: it is the
-   one file outside `/home/adrian/agent-switch`, `AGENTS.md` → *Touch boundary* puts
+   one file outside `<project root>`, `AGENTS.md` → *Touch boundary* puts
    everything outside the repo behind the operator's agreement, and it is global
    configuration — it changes key handling for every session and every project on
    this machine, cannot be reviewed as a repo diff, and rolls back by deleting one
    file. The agreement exists: the trade is recorded in the spec's `## Log` and in
    the touch boundary. The file is not part of the commit.
-   Proof: `node -e 'console.log(require("/home/adrian/.pi/agent/keybindings.json"))'`
+   Proof: `node -e 'console.log(require(process.env.HOME + "/.pi/agent/keybindings.json"))'`
    prints `{ 'app.thinking.cycle': [] }`.
 
 3. **Not implementer work: the live checks.** Criteria 4, 5 and 6 need a running pi

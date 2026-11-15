@@ -93,7 +93,7 @@ records that, and records the live check that *is* reachable.
 
 ## Touch boundary
 
-- Everything inside `/home/adrian/agent-switch`.
+- Everything inside `<project root>`.
 - **Not** `~/.pi/agent/**`, not `~/.agents/**`.
 - **Not** generated folders: `node_modules/`, `coverage/`, `dist/`.
 - The spec itself belongs to the orchestrator; the implementer changes the two
