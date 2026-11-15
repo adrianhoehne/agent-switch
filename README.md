@@ -10,13 +10,20 @@ transcript is never rewritten.
 
 ## Requirements
 
-- pi 1.3.0 — the version this was built and tested against (`pi --version`).
+- pi 1.5.2 — the version this was built and tested against (`pi --version`). The suite
+  also passed on 1.3.0.
 - The agent definitions you want to cycle through, in one of the directories listed
   under [Where agents are read from](#where-agents-are-read-from).
 - One line of keybinding configuration, see below. **Without it the extension has no
   shortcut.**
 
 ## Install
+
+Release install — for anyone who is not the author:
+
+```bash
+pi install git:github.com/adrianhoehne/agent-switch@v0.1.0
+```
 
 Personal install — the extension loads in every pi session:
 
@@ -145,7 +152,7 @@ one. That is the same effect as switching the model by hand.
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit, strict
-npm test            # vitest, 54 cases
+npm test            # vitest, 58 cases
 ```
 
 Layout:
@@ -164,5 +171,15 @@ The behaviour is specified in `docs/`; start with `docs/README.md` for the forma
 
 ## Status
 
-Version 0.0.0, not published. The package manifest carries `private: true` and no
-`pi-package` keyword, so `pi install` works from a path or a git URL, not from npm.
+Version 0.1.0, MIT, and the repository is public at
+[github.com/adrianhoehne/agent-switch](https://github.com/adrianhoehne/agent-switch). The
+extension installs from the git URL above or from a local path.
+
+It is **not** published to npm, because the name `agent-switch` there belongs to another
+package. The `pi-package` keyword in the manifest is metadata for the pi gallery; it only
+matters once an npm package exists.
+
+## Licence
+
+MIT, copyright (c) 2026 Adrian Alexander Höhne. The full text is in
+[LICENSE](LICENSE).

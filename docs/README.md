@@ -61,6 +61,7 @@ down in [`AGENTS.md`](../AGENTS.md).
 | [`02-tests-close-the-gaps.md`](02-tests-close-the-gaps.md) | Closes three test gaps of 01 and stops the shortcut recording a selection before the cycle exists | active |
 | [`03-shift-tab-shortcut.md`](03-shift-tab-shortcut.md) | Moves the cycle from `ctrl+shift+a` to `shift+tab` and releases that key from pi's thinking cycle | active |
 | [`04-agent-model-and-thinking.md`](04-agent-model-and-thinking.md) | Adopts an agent's optional `model` and `thinking`, falling back per field, and restores the session's start on `Main` | active |
+| [`05-release-packaging.md`](05-release-packaging.md) | Prepares the plugin for a public release: MIT licence, release metadata, a manifest guard test, a CI workflow and a README that names the install | active |
 
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.

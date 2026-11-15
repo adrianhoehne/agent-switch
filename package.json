@@ -1,7 +1,16 @@
 {
   "name": "agent-switch",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "A pi extension that switches the main agent of a running conversation onto another agent's system prompt.",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "engines": { "node": ">=22.19.0" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adrianhoehne/agent-switch.git"
+  },
+  "homepage": "https://github.com/adrianhoehne/agent-switch#readme",
+  "bugs": { "url": "https://github.com/adrianhoehne/agent-switch/issues" },
   "type": "module",
   "pi": {
     "extensions": ["./src/extension.ts"]
@@ -10,11 +19,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "files": ["src", "README.md", "LICENSE"],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.3.0",
+    "@earendil-works/pi-coding-agent": "1.5.2",
     "@types/node": "22.20.5",
     "typescript": "6.0.3",
     "vitest": "5.1.0"
