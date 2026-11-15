@@ -60,6 +60,17 @@ shortcut on a key a reserved built-in owns, so the key has to be released first.
 
 An empty list is how pi disables an action's bindings. Then run `/reload`.
 
+The file is in the repository as [`keybindings.json`](keybindings.json) and attached to
+the release, so it can be copied instead of typed:
+
+```bash
+curl -fsSL https://github.com/adrianhoehne/agent-switch/releases/download/v0.1.0/keybindings.json \
+  -o ~/.pi/agent/keybindings.json
+```
+
+That command **replaces** whatever the file holds. If you already bind keys there, add
+the `app.thinking.cycle` line to your file instead of downloading over it.
+
 If the file is missing, pi drops the shortcut and reports
 `Extension shortcut 'shift+tab' … conflicts with built-in shortcut. Skipping.` in its
 `[Extension issues]` block at startup. The extension itself keeps working through
