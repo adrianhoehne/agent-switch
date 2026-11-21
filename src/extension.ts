@@ -17,24 +17,31 @@ import {
 } from "./state";
 
 /**
- * `shift+tab`, because it arrives as `ESC[Z` on every terminal and stays
- * distinguishable even where the shift modifier is not reported separately — that
- * gap is what made a `ctrl+shift+…` id unreliable (plain xterm, tmux with
- * `extended-keys off`, most macOS terminals).
+ * Two keys, one action.
  *
- * The key is not free: pi's built-in `app.thinking.cycle` owns it, and pi drops an
- * extension shortcut that collides with a reserved built-in, so
- * `<agent-dir>/keybindings.json` must carry `{ "app.thinking.cycle": [] }` — the
- * empty list is how pi disables an action's bindings. The trade is accepted:
- * `/thinking [level]` still sets the level. There is deliberately no fallback key,
- * so without that file the extension has no shortcut at all.
+ * `shift+tab` is the key this extension started with: it arrives as `ESC[Z` on
+ * every terminal and stays distinguishable even where the shift modifier is not
+ * reported separately — that gap is what made a `ctrl+shift+…` id unreliable
+ * (plain xterm, tmux with `extended-keys off`, most macOS terminals). It is not
+ * free: pi's built-in `app.thinking.cycle` owns it, and pi drops an extension
+ * shortcut that collides with a reserved built-in, so `<agent-dir>/keybindings.json`
+ * must carry `{ "app.thinking.cycle": [] }` — the empty list is how pi disables an
+ * action's bindings. The trade is accepted: `/thinking [level]` still sets the
+ * level.
  *
- * Literal key id, not one built with `Key`: `Key` lives in
+ * `f2` is the second key and needs no configuration at all: no pi default binding
+ * uses a function key, so nothing has to be released for it, and where a terminal
+ * sends `f2` it arrives as a fixed escape sequence. That is the combination that
+ * keeps the cycle reachable for an operator who does not want to give `shift+tab`
+ * away.
+ *
+ * Literal key ids, not ones built with `Key`: `Key` lives in
  * `@earendil-works/pi-tui` and is not re-exported by
- * `@earendil-works/pi-coding-agent`, so building the id would add a direct
- * dependency for a string pi matches verbatim anyway.
+ * `@earendil-works/pi-coding-agent`, so building them would add a direct
+ * dependency for strings pi matches verbatim anyway.
  */
-const SHORTCUT_KEY = "shift+tab";
+const SHORTCUT_KEYS = ["shift+tab", "f2"] as const;
+const [SHORTCUT_KEY, SECOND_SHORTCUT_KEY] = SHORTCUT_KEYS;
 
 /** Footer status slot. One segment next to pi's own; no custom footer. */
 const STATUS_KEY = "agent";
@@ -239,50 +246,66 @@ export default function agentSwitch(pi: ExtensionAPI): void {
     }
   });
 
+  /**
+   * One press, one step — the whole cycle, shared by both keys.
+   *
+   * Deliberately a single function registered twice: two copies would drift, and a
+   * fix in one would then silently skip the other. It is registered by reference
+   * for the same reason; an arrow wrapper per registration would compile and make
+   * "both keys reach the same handler" a claim nobody can check.
+   */
+  async function cycleAgent(ctx: ExtensionContext): Promise<void> {
+    // An empty cycle means no `session_start` has run yet (a fresh session, a
+    // reload in progress): there is no stop to advance to, so the press does
+    // nothing — no entry for a selection nobody made, no footer write naming a
+    // stop that does not exist, and no throw into pi mid-keypress.
+    if (cycle.length === 0) {
+      return;
+    }
+
+    // A swap mid-run would let a response and its tool continuation run on two
+    // different models. The press is rejected instead of queued: the operator
+    // presses again once the run is over.
+    if (!ctx.isIdle()) {
+      ctx.ui.notify(
+        "A response is still streaming — the agent is switched once it is idle.",
+        "warning",
+      );
+      return;
+    }
+
+    // Read before the label moves: once `currentLabel` names the next stop, the
+    // information "we are leaving Main" is gone.
+    const previousLabel = currentLabel;
+    currentLabel = nextLabel(cycle, currentLabel);
+    if (previousLabel === MAIN_LABEL && mainSnapshot === null) {
+      // The one and only capture site. In `session_start` it would be wrong: pi
+      // persists the session model in the transcript, so a resumed session's
+      // `ctx.model` is already the agent's model and the snapshot would record
+      // that as the starting state.
+      //
+      // `pi.getThinkingLevel()`, not `ctx.thinkingLevel`: the context member is
+      // optional and this snapshot needs a value.
+      mainSnapshot = { model: ctx.model, thinking: pi.getThinkingLevel() };
+    }
+
+    pi.appendEntry(STATE_CUSTOM_TYPE, { name: currentLabel });
+    setLabel(ctx);
+
+    const deps = selectionDeps(ctx);
+    const agent = selectedAgent();
+    await (agent === null ? restoreMain(mainSnapshot, deps) : applySelection(agent, deps));
+  }
+
+  // Two statements, not a loop over `SHORTCUT_KEYS`: the pair is spelled out so
+  // that reading the wiring takes no indirection.
   pi.registerShortcut(SHORTCUT_KEY, {
     description: SHORTCUT_DESCRIPTION,
-    handler: async (ctx) => {
-      // An empty cycle means no `session_start` has run yet (a fresh session, a
-      // reload in progress): there is no stop to advance to, so the press does
-      // nothing — no entry for a selection nobody made, no footer write naming a
-      // stop that does not exist, and no throw into pi mid-keypress.
-      if (cycle.length === 0) {
-        return;
-      }
-
-      // A swap mid-run would let a response and its tool continuation run on two
-      // different models. The press is rejected instead of queued: the operator
-      // presses again once the run is over.
-      if (!ctx.isIdle()) {
-        ctx.ui.notify(
-          "A response is still streaming — the agent is switched once it is idle.",
-          "warning",
-        );
-        return;
-      }
-
-      // Read before the label moves: once `currentLabel` names the next stop, the
-      // information "we are leaving Main" is gone.
-      const previousLabel = currentLabel;
-      currentLabel = nextLabel(cycle, currentLabel);
-      if (previousLabel === MAIN_LABEL && mainSnapshot === null) {
-        // The one and only capture site. In `session_start` it would be wrong: pi
-        // persists the session model in the transcript, so a resumed session's
-        // `ctx.model` is already the agent's model and the snapshot would record
-        // that as the starting state.
-        //
-        // `pi.getThinkingLevel()`, not `ctx.thinkingLevel`: the context member is
-        // optional and this snapshot needs a value.
-        mainSnapshot = { model: ctx.model, thinking: pi.getThinkingLevel() };
-      }
-
-      pi.appendEntry(STATE_CUSTOM_TYPE, { name: currentLabel });
-      setLabel(ctx);
-
-      const deps = selectionDeps(ctx);
-      const agent = selectedAgent();
-      await (agent === null ? restoreMain(mainSnapshot, deps) : applySelection(agent, deps));
-    },
+    handler: cycleAgent,
+  });
+  pi.registerShortcut(SECOND_SHORTCUT_KEY, {
+    description: SHORTCUT_DESCRIPTION,
+    handler: cycleAgent,
   });
 
   pi.on("before_agent_start", (event) => {

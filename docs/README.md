@@ -58,12 +58,13 @@ of this repository; what a reader needs from it is the format below.
 
 | File | Content | Status |
 |---|---|---|
-| [`01-switch-main-agent-prompt.md`](01-switch-main-agent-prompt.md) | Cycles the main agent's system prompt through the agent definition files on `shift+tab`, keeping project context and history intact | active |
+| [`01-switch-main-agent-prompt.md`](01-switch-main-agent-prompt.md) | Cycles the main agent's system prompt through the agent definition files on `shift+tab` or `f2`, keeping project context and history intact | active |
 | [`02-tests-close-the-gaps.md`](02-tests-close-the-gaps.md) | Closes three test gaps of 01 and stops the shortcut recording a selection before the cycle exists | active |
 | [`03-shift-tab-shortcut.md`](03-shift-tab-shortcut.md) | Moves the cycle from `ctrl+shift+a` to `shift+tab` and releases that key from pi's thinking cycle | active |
 | [`04-agent-model-and-thinking.md`](04-agent-model-and-thinking.md) | Adopts an agent's optional `model` and `thinking`, falling back per field, and restores the session's start on `Main` | active |
 | [`05-release-packaging.md`](05-release-packaging.md) | Prepares the plugin for a public release: MIT licence, release metadata, a manifest guard test, a CI workflow and a README that names the install | active |
 | [`06-publish-on-github.md`](06-publish-on-github.md) | Publishes the packaged plugin on GitHub: docs scrub, workstation files out of the index, commit-identity rewrite, push, CI, tag `v0.1.0` | active |
+| [`07-second-shortcut.md`](07-second-shortcut.md) | Adds `f2` as a second shortcut beside `shift+tab`, sharing one handler, so the cycle works without the keybinding release; withdraws the two-key rejection from `docs/03` | active |
 
 The table lists only files that exist. Each spec is added here with its `Status`
 when it is committed.

@@ -24,11 +24,13 @@ onto the key.
 ## Non-goals
 
 - **No** second shortcut. One key, one action; `ctrl+shift+a` is not kept as a
-  fallback.
+  fallback. *Withdrawn on 2026-11-15 by `docs/07-second-shortcut.md`, which adds `f2` as a
+  second key: an operator who does not want to release `shift+tab` had no way in at all.*
 - **No** slash command as a further entry point (`/agent`). Useful, but it is a
   separate decision and a separate increment.
 - **No** configurable shortcut (CLI flag or settings key). `shift+tab` is the answer
-  for this project; configurability can come when a second project needs it.
+  for this project; configurability can come when a second project needs it. The answer is
+  now the pair `shift+tab` and `f2` — the configurability question itself is still open.
 - **No** change to how thinking levels are set, displayed or persisted beyond
   releasing the key. An agent definition may carry a `thinking:` value since
   `docs/04-agent-model-and-thinking.md`; that increment owns the rule, not this one.
@@ -39,7 +41,7 @@ onto the key.
 |---|---|
 | `~/.pi/agent/keybindings.json` | **new file**, content `{ "app.thinking.cycle": [] }` — the empty list is how pi disables an action's bindings |
 | `src/extension.ts` | `SHORTCUT_KEY` becomes `"shift+tab"`; the comment above it explains the release and why the key was chosen |
-| `test/extension.test.ts` | the case `shortcut is registered` asserts `"shift+tab"` instead of `"ctrl+shift+a"` |
+| `test/extension.test.ts` | the case `shortcut is registered` asserts `"shift+tab"` instead of `"ctrl+shift+a"`; since `docs/07` it asserts the pair `["shift+tab", "f2"]` |
 
 No interface changes. The handler, the guard, the footer status and the session entry
 stay exactly as they are; only the key differs.
@@ -61,21 +63,24 @@ Criteria 4–6 are the operator's live check; the first two decide the commit.
 
 | File | Case | What it proves |
 |---|---|---|
-| `test/extension.test.ts` | `shortcut is registered` *(changed)* | the registered key is exactly `shift+tab`, and the description is still set |
-| | the other 34 cases *(unchanged)* | the handler, the guard, the footer, persistence and restore do not care which key triggers them |
+| `test/extension.test.ts` | `shortcut is registered` *(changed)* | the registered keys are exactly `shift+tab` and `f2`, and the description is still set |
+| | the remaining cases *(unchanged)* | the handler, the guard, the footer, persistence and restore do not care which key triggers them |
 
-No new case: the key is a constant, and asserting it twice adds nothing. The
-behaviour behind it is covered by the existing cases. A test cannot cover the
+Since `docs/07` this file gains two new cases — `both keys share one handler` and
+`f2 press cycles the agent` — and `shortcut is registered` asserts the pair, because
+there are now three facts (two keys, one function, same effect) instead of one. A test
+cannot cover the
 keybindings file either: it lives outside the repository, and pi exports only `.` and
 `./rpc-entry`, so the resolved binding table is unreachable without a deep import
 into `dist/` — the trap `docs/01` rejected for `pi-subagents`.
 
 ## Risks and alternatives
 
-- **Without the keybindings release the shortcut disappears.** pi drops the
+- **Without the keybindings release `shift+tab` disappears.** pi drops that
   registration and reports it in the `[Extension issues]` startup block — visible,
   but only there, which is exactly why criterion 4 exists. The release is a one-line
-  file that has to exist on every machine this project runs on.
+  file that has to exist on every machine this project runs on. Since `docs/07` a
+  missing file costs one key, not the shortcut: `f2` needs no release.
 - **`shift+tab` inside pi's dialogs.** `app.thinking.cycle` is the only binding on
   that key in 1.3.0 — no selector or picker handles `\x1b[Z`, and pi's picker
   bindings are explicitly outside the reserved list. So inside a dialog `shift+tab`
@@ -83,7 +88,9 @@ into `dist/` — the trap `docs/01` rejected for `pi-subagents`.
   extension handler runs.
 - **Rejected alternative: keeping both keys.** Two shortcuts for one action shows up
   twice in `/hotkeys` and doubles the conflict surface. The one the operator wants is
-  the one that stays.
+  the one that stays. *Withdrawn on 2026-11-15 by `docs/07-second-shortcut.md`: the trade-off
+  was reconsidered because a user who keeps `shift+tab` had no way in at all, and the second
+  key is one that no pi default binds.*
 - **Rejected alternative: a slash command instead of a key.** It works everywhere, but
   it is not what the operator asked for here.
 
@@ -127,8 +134,9 @@ with the operator on 2026-11-12.
    `registerShortcut(...)`, `SHORTCUT_DESCRIPTION`, the empty-cycle guard and
    `setLabel` stay byte-identical. In `test/extension.test.ts` change the single
    literal in the case `shortcut is registered` from `"ctrl+shift+a"` to
-   `"shift+tab"`; the helper `pressShortcut` reads `stub.shortcuts[0]`, so no other
-   case and no new case is needed or wanted.
+   `"shift+tab"`. Since `docs/07` the helper takes the key as its third argument and
+   finds the registration by name, so a second key needs no new plumbing — only the two
+   cases and the widened assertion.
    Proof: `npm run typecheck` exits 0; `npm test` exits 0 and its summary reads
    `Tests  35 passed (35)`. The literal itself is not printed by vitest; criterion 2's
    "asserting the new key" is shown by the diff of that line, not by the run.
@@ -185,20 +193,20 @@ stage 2 first, not in the constant. Sequence: 1 → 2 → 3 → 4 → review →
 
 ### What the next increment inherits
 
-- **No fallback.** `ctrl+shift+a` is gone; a machine without
-  `~/.pi/agent/keybindings.json` has no working shortcut at all. The file is a
-  prerequisite, not an optimisation.
+- **A fallback now exists.** `ctrl+shift+a` is gone, and since `docs/07` a machine
+  without `~/.pi/agent/keybindings.json` still cycles the agent through `f2`. The file is
+  required for `shift+tab`, not for the shortcut.
 - **Thinking lost its key globally.** `app.thinking.cycle` stays unbound for every
   project on this machine until it is rebound; `/thinking [level]` remains.
-- **Still out of scope:** a `/agent` slash command, a configurable shortcut, a second
-  key. Each is a separate spec.
+- **Still out of scope:** a `/agent` slash command and a configurable shortcut. Each is a
+  separate spec. *(A second key was out of scope here and arrived in `docs/07`.)*
 - `docs/README.md`'s `Status` column is the orchestrator's to maintain.
 
 ## Known gaps
 
 | Gap | Why it stays open |
 |---|---|
-| `~/.pi/agent/keybindings.json` is a prerequisite on every machine | without it pi drops the registration and the extension has no shortcut at all. It cannot live in the repository, because pi reads it from the agent directory |
+| `~/.pi/agent/keybindings.json` is a prerequisite on every machine for `shift+tab` | without it pi drops that registration; since `docs/07` `f2` still works, so the file costs one key rather than the shortcut. It cannot live in the repository, because pi reads it from the agent directory |
 | `app.thinking.cycle` stays unbound for every project on this machine | the release is global by nature; `/thinking [level]` is the remaining entry point, and rebinding the key per project is not something pi supports |
 | `/hotkeys` renders an empty key cell for "Cycle thinking level" | with the action unbound, the row keeps its label and loses its key. Cosmetic; no action |
 

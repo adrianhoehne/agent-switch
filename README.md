@@ -1,9 +1,9 @@
 # agent-switch
 
 A pi extension that switches the main agent of a running conversation onto a
-different system prompt. `shift+tab` cycles between `Main` — pi's own prompt — and
-the agent definitions on your machine; the next message is composed with the selected
-agent's prompt, and the conversation continues where it was.
+different system prompt. `shift+tab` or `f2` cycles between `Main` — pi's own prompt —
+and the agent definitions on your machine. One press is one step. The next message is
+composed with the selected agent's prompt, and the conversation continues where it was.
 
 Project context, the skill catalogue and the working directory stay in the prompt. The
 transcript is never rewritten.
@@ -14,8 +14,8 @@ transcript is never rewritten.
   also passed on 1.3.0.
 - The agent definitions you want to cycle through, in one of the directories listed
   under [Where agents are read from](#where-agents-are-read-from).
-- One line of keybinding configuration, see below. **Without it the extension has no
-  shortcut.**
+- One line of keybinding configuration for `shift+tab`, see below. **Without it
+  `shift+tab` has no shortcut; `f2` works regardless.**
 
 ## Install
 
@@ -49,8 +49,10 @@ running session or start a new one.
 ## The keybinding prerequisite
 
 `shift+tab` belongs to pi's built-in `app.thinking.cycle`. pi refuses an extension
-shortcut on a key a reserved built-in owns, so the key has to be released first. Create
-`<agent-dir>/keybindings.json` (default `~/.pi/agent/keybindings.json`):
+shortcut on a key a reserved built-in owns, so the key has to be released first. The
+file is needed for `shift+tab` only: `f2` is bound by no pi default and needs no
+configuration. Create `<agent-dir>/keybindings.json` (default
+`~/.pi/agent/keybindings.json`):
 
 ```json
 {
@@ -71,10 +73,10 @@ curl -fsSL https://github.com/adrianhoehne/agent-switch/releases/download/v0.1.1
 That command **replaces** whatever the file holds. If you already bind keys there, add
 the `app.thinking.cycle` line to your file instead of downloading over it.
 
-If the file is missing, pi drops the shortcut and reports
+If the file is missing, `f2` still cycles; only `shift+tab` is dropped. pi skips that
+registration and reports
 `Extension shortcut 'shift+tab' … conflicts with built-in shortcut. Skipping.` in its
-`[Extension issues]` block at startup. The extension itself keeps working through
-`Main` — it simply has no key.
+`[Extension issues]` block at startup.
 
 The thinking level is still settable, with `/thinking <level>`.
 
@@ -82,7 +84,8 @@ The thinking level is still settable, with `/thinking <level>`.
 
 | Key | Effect |
 |---|---|
-| `shift+tab` | next entry in the cycle, wrapping |
+| `shift+tab` | next entry in the cycle, wrapping; needs the keybinding file |
+| `f2` | next entry in the cycle, wrapping; needs no configuration |
 | — | the footer shows `Main` or the selected agent's name |
 
 The cycle is `Main`, then every enabled agent sorted by name. A press takes effect on
@@ -153,7 +156,7 @@ Nothing else. Tools, extensions, permissions and the conversation history are un
 | A bare model id is first-match-wins | `getAvailable()` order decides across providers |
 | Thinking is not validated against the model | pi clamps an unsupported level; the footer shows the effective value |
 | A resume writes a `model_change` entry | even when the model is already current |
-| No picker, no slash command | one key, one direction; `/agent <name>` is not built |
+| No picker, no slash command | two keys, one direction; `/agent <name>` is not built |
 
 A model switch changes the context window; a long conversation may be compacted after
 one. That is the same effect as switching the model by hand.
@@ -163,7 +166,7 @@ one. That is the same effect as switching the model by hand.
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit, strict
-npm test            # vitest, 58 cases
+npm test            # vitest, 60 cases
 ```
 
 Layout:

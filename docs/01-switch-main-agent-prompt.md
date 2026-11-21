@@ -1,5 +1,5 @@
 ---
-description: Cycles the main agent's system prompt through the agent definition files on shift+tab, effective on the next message, keeping project context and conversation history intact.
+description: Cycles the main agent's system prompt through the agent definition files on shift+tab or f2, effective on the next message, keeping project context and conversation history intact.
 status: active
 ---
 
@@ -11,7 +11,7 @@ session check is recorded in `## Log`.
 ## Goal
 
 The main agent of a pi session changes the system prompt it answers with, without
-restarting the session. `shift+tab` cycles through `Main` — pi's own prompt — and
+restarting the session. `shift+tab` or `f2` cycles through `Main` — pi's own prompt — and
 the agent definitions found on the machine; the footer names the active one. From
 the next message on, the request carries that agent's prompt body as its role
 prompt. Project context (this file, the skill catalogue, the working directory)
@@ -21,7 +21,7 @@ stays in the request, and the conversation is never rewritten.
 
 | Point | Decision |
 |---|---|
-| Trigger | `shift+tab` cycles forward, wrapping. No picker dialog. |
+| Trigger | `shift+tab` or `f2` cycles forward, wrapping. No picker dialog. |
 | Cycle list | `Main` first, then all loaded agents sorted case-insensitively by name, `enabled: false` skipped |
 | Footer | `ctx.ui.setStatus("agent", …)` shows `Main` or the agent name. The working row stays pi's own (`⠋ Working…`). |
 | Prompt swap | `prompt_mode: replace` sets `systemPromptOptions.customPrompt`; `append` sets `appendSystemPrompt`. Both leave `project_context`, `skills`, `cwd`, `selectedTools` and extension sections untouched. |
@@ -34,7 +34,7 @@ stays in the request, and the conversation is never rewritten.
 - **No** adoption of `tools` from the agent file. `model` and `thinking` are adopted,
   per `docs/04-agent-model-and-thinking.md`; tools stay out because a prompt swap keeps
   tool availability stable, which adopting tools would change mid-conversation.
-- **No** slash command and no picker dialog. One shortcut, one direction.
+- **No** slash command, no picker dialog. Two keys (`shift+tab`, `f2`), one direction.
 - **No** editing or creating agent files.
 - **No** spawning subagents — this changes the prompt of the *main* agent.
 - **No** custom footer. The built-in footer keeps its layout; only one status
@@ -129,7 +129,7 @@ Rules fixed here:
 | 6 | Cycle order is `Main`, then agents sorted case-insensitively by name, wrapping | cases `cycle starts at Main`, `cycle sorts agents by name`, `cycle wraps to Main` |
 | 7 | `enabled: false` agents are not in the cycle | case `disabled agent is skipped` |
 | 8 | Discovery is name-keyed: a project agent replaces a global one of the same name, one entry remains | cases `project agent overrides global`, `duplicate name: later tier wins` |
-| 9 | The shortcut is registered on `shift+tab` | case `shortcut is registered` |
+| 9 | The shortcut is registered on `shift+tab` and `f2`, one shared handler | case `shortcut is registered` and `both keys share one handler` |
 | 10 | After a cycle the footer status carries `Main` or the agent name | case `footer shows the current name` |
 | 11 | The choice is written as a `custom` entry with `customType: "agent-switch-state"` and restored on `session_start` | cases `selection is persisted`, `restore last selection` |
 | 12 | A selection whose agent file disappeared falls back to `Main` with a warning | case `missing agent falls back to Main` |
@@ -165,7 +165,8 @@ call still works" is part of the manual check.
 | | `cycle sorts agents by name` | the sort half of criterion 6 |
 | | `cycle uses agent names` | the label is the agent name, not the path |
 | | `unknown label resolves to Main` | a stale label cannot freeze the cycle |
-| `test/extension.test.ts` | `shortcut is registered` | exactly `shift+tab` |
+| `test/extension.test.ts` | `shortcut is registered` | exactly `shift+tab` and `f2`, with one shared description |
+| | `both keys share one handler` | the two registrations reference the same function |
 | | `before_agent_start applies the current agent` | the registered handler really reaches `applyAgentToPromptOptions` |
 | | `footer shows the current name` | `setStatus` receives `Main` or the name |
 | | `selection is persisted` | the entry carries `customType: "agent-switch-state"` |
@@ -200,8 +201,9 @@ call still works" is part of the manual check.
   reserved built-in and warns on the others. `shift+tab` is such a key:
   `app.thinking.cycle` owns it, so the registration is only kept when
   `<agent-dir>/keybindings.json` releases it with `{ "app.thinking.cycle": [] }`
-  (`docs/03-shift-tab-shortcut.md`). Without that file the extension has no shortcut
-  and pi reports the conflict in its `[Extension issues]` block.
+  (`docs/03-shift-tab-shortcut.md`). Without that file only `shift+tab` is dropped, and pi
+  reports the conflict in its `[Extension issues]` block; `f2` is bound by no pi default
+  and keeps working.
 - **Agent bodies are repo-controlled text that becomes the system prompt.**
   `.pi/agents/*.md` is not behind pi's project-trust gate (that gate lists
   `settings.json`, `mcp.json`, `extensions`, `skills`, `prompts`, `themes` and
@@ -386,9 +388,9 @@ edited by hand — `## Touch boundary`). No stage depends on a later one.
   branch. Recorded, not fixed here.
 - **Shortcut collision.** `shift+tab` is owned by `app.thinking.cycle` in pi
   1.3.0's defaults, which is why this project releases it in
-  `<agent-dir>/keybindings.json`. On a machine without that file pi drops the
-  registration and says so in the `[Extension issues]` block; only a live run proves
-  the key works.
+  `<agent-dir>/keybindings.json`. On a machine without that file pi drops the `shift+tab`
+  registration and says so in the `[Extension issues]` block; `f2` needs no file. Only a
+  live run proves a terminal delivers the key.
 
 ### Ordering and dependencies
 

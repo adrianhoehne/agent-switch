@@ -395,10 +395,18 @@ function startSession(stub: StubApi, context: StubContext): Promise<unknown> {
   );
 }
 
-function pressShortcut(stub: StubApi, context: StubContext): Promise<void> {
-  const shortcut = stub.shortcuts[0];
+/**
+ * Presses the shortcut registered under `key`.
+ *
+ * The key is a parameter, not "whichever shortcut came first": with two keys
+ * registered, the positional read would silently depend on registration order and a
+ * case could pass while pressing a key it never named. A missing registration is a
+ * wiring failure here, exactly as in `requireHandler`.
+ */
+function pressShortcut(stub: StubApi, context: StubContext, key: string): Promise<void> {
+  const shortcut = stub.shortcuts.find((registered) => registered.key === key);
   if (shortcut === undefined) {
-    throw new Error("The extension registered no shortcut.");
+    throw new Error(`The extension registered no "${key}" shortcut.`);
   }
   // Returns the handler's promise: the press applies the agent before it resolves,
   // so a case that asserts what the press changed has to await it.
@@ -428,10 +436,27 @@ it("shortcut is registered", () => {
   const stub = createStubApi();
   agentSwitch(stub.api);
 
-  // THEN exactly one shortcut exists, on the literal key pi matches verbatim,
-  expect(stub.shortcuts).toHaveLength(1);
-  expect(stub.shortcuts[0].key).toBe("shift+tab");
-  expect(stub.shortcuts[0].description).toBeTruthy();
+  // THEN two shortcuts exist, on the literal keys pi matches verbatim, in this order,
+  expect(stub.shortcuts.map((shortcut) => shortcut.key)).toEqual(["shift+tab", "f2"]);
+
+  // AND both carry one and the same description, because it is one action:
+  const [primary, secondary] = stub.shortcuts;
+  expect(primary.description).toBeTruthy();
+  expect(secondary.description).toBe(primary.description);
+});
+
+it("both keys share one handler", () => {
+  // GIVEN the extension wired against a stub API,
+  const stub = createStubApi();
+  agentSwitch(stub.api);
+
+  // WHEN both registrations are read,
+  const [primary, secondary] = stub.shortcuts;
+
+  // THEN they reference the same function — not two wrappers that happen to do the
+  // same thing. Reference identity is the point: a per-registration arrow would
+  // compile and leave a later fix in one key unable to reach the other.
+  expect(primary.handler).toBe(secondary.handler);
 });
 
 it("press before session_start is a no-op", async () => {
@@ -445,7 +470,7 @@ it("press before session_start is a no-op", async () => {
   // THEN it does not throw — and does not reject, now that the handler is async: a
   // keyboard handler that crashes pi mid-keypress is worse than one that waits for
   // the session to arrive,
-  await expect(pressShortcut(stub, session)).resolves.toBeUndefined();
+  await expect(pressShortcut(stub, session, "shift+tab")).resolves.toBeUndefined();
 
   // AND it leaves no trace — no entry recording a selection nobody made, and no
   // footer text naming a stop that does not exist:
@@ -472,9 +497,9 @@ it("second session_start does not duplicate the cycle", async () => {
   await startSession(stub, session);
 
   // AND the shortcut is pressed three times,
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN the presses walk the rebuilt cycle exactly once: `alpha`, `mike`, `zulu`.
   // A cycle that had been appended to instead of rebuilt would read
@@ -515,7 +540,7 @@ it("before_agent_start applies the current agent", async () => {
   agentSwitch(stub.api);
   const session = createStubContext({ cwd: fixture.cwd });
   await startSession(stub, session);
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
 
   // WHEN the next message is about to be composed,
   const options = createPromptOptions();
@@ -543,7 +568,7 @@ it("footer shows the current name", async () => {
   expect(session.statuses).toEqual([{ key: "agent", text: MAIN_LABEL }]);
 
   // AND one press replaces the text with the agent's name, same key:
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "reviewer" });
 });
 
@@ -556,7 +581,7 @@ it("selection is persisted", async () => {
   await startSession(stub, session);
 
   // WHEN the shortcut selects it,
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN the choice is written as this extension's `custom` entry, so a resume can
   // find it again:
@@ -614,12 +639,33 @@ it("cycle applies the agent's model and level", async () => {
   await startSession(stub, session);
 
   // WHEN the shortcut selects it,
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN the handler wires the decision half: the model goes first, then the level
   // pi clamps against that model — and the footer already names the new agent:
   expect(stub.calls).toEqual(["setModel anthropic/claude-sonnet-4", "setThinkingLevel high"]);
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "architect" });
+});
+
+it("f2 press cycles the agent", async () => {
+  // GIVEN one project agent naming a model and a level, and a started session,
+  fixture.writeAgent("architect", REVIEWER_PROMPT, {
+    model: "anthropic/claude-sonnet-4",
+    thinking: "high",
+  });
+  const { stub, session } = createStubPair();
+  agentSwitch(stub.api);
+  await startSession(stub, session);
+
+  // WHEN the second key selects it,
+  await pressShortcut(stub, session, "f2");
+
+  // THEN it does exactly what a `shift+tab` press does — one recorded selection, the
+  // footer label, the model and the level. The facts repeat the `shift+tab` cases on
+  // purpose: the new information is which key id reaches that effect.
+  expect(stub.entries).toEqual([{ customType: STATE_CUSTOM_TYPE, data: { name: "architect" } }]);
+  expect(session.statuses.at(-1)).toEqual({ key: "agent", text: "architect" });
+  expect(stub.calls).toEqual(["setModel anthropic/claude-sonnet-4", "setThinkingLevel high"]);
 });
 
 it("Main restores the snapshot", async () => {
@@ -634,8 +680,8 @@ it("Main restores the snapshot", async () => {
   await startSession(stub, session);
 
   // WHEN the cycle leaves `Main` and comes back to it,
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN `Main` puts the starting model and level back: they were captured before
   // the agent's values were applied, which is why the starting model is second and
@@ -665,9 +711,9 @@ it("agents do not re-snapshot", async () => {
   await startSession(stub, session);
 
   // WHEN the cycle walks `Main, alpha, zulu` and then back to `Main`,
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN the third promise is the snapshot taken on the first press, not the state
   // `alpha` left behind: moving between two agents does not move the target
@@ -694,7 +740,7 @@ it("press while streaming changes nothing", async () => {
   await startSession(stub, session);
 
   // WHEN the shortcut is pressed mid-run,
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN nothing changes: no entry for a selection nobody made, the footer keeps
   // the one text `session_start` wrote, no model and no level move, and one warning
@@ -722,8 +768,8 @@ it("Main restore that throws warns instead of crashing", async () => {
 
   // WHEN the cycle leaves `Main` — no `setModel` on that press, so the throw below
   // belongs to the restore alone — and comes back to it,
-  await pressShortcut(stub, session);
-  await expect(pressShortcut(stub, session)).resolves.toBeUndefined();
+  await pressShortcut(stub, session, "shift+tab");
+  await expect(pressShortcut(stub, session, "shift+tab")).resolves.toBeUndefined();
 
   // THEN the throw becomes a warning naming the model instead of an exception out
   // of a keypress, and the level is restored anyway (the two fields fall back
@@ -749,8 +795,8 @@ it("snapshot without a model still restores the level", async () => {
   await startSession(stub, session);
 
   // WHEN the cycle leaves `Main` and comes back to it,
-  await pressShortcut(stub, session);
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
+  await pressShortcut(stub, session, "shift+tab");
 
   // THEN the restore skips the model silently — there is nothing to put back, and
   // absence is not a failure — and still restores the level:
@@ -784,7 +830,7 @@ it("resume applies the selection again", async () => {
   // AND a later press back to `Main` applies nothing, because a resumed session has
   // no snapshot — the in-memory limit, pinned here so it cannot regress into a
   // silent restore of the agent's model:
-  await pressShortcut(stub, session);
+  await pressShortcut(stub, session, "shift+tab");
   expect(session.statuses.at(-1)).toEqual({ key: "agent", text: MAIN_LABEL });
   expect(stub.calls).toEqual([
     "setModel anthropic/claude-sonnet-4",
