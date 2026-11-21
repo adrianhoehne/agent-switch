@@ -1,6 +1,6 @@
 {
   "name": "agent-switch",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A pi extension that switches the main agent of a running conversation onto another agent's system prompt.",
   "license": "MIT",
   "keywords": [

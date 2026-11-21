@@ -65,7 +65,7 @@ State values: **open** (needs work), **question** (needs a decision first),
 | Move the cycle to `shift+tab` and release it from the thinking cycle | `docs/03-shift-tab-shortcut.md` |
 | Adopt an agent's optional `model` and `thinking`, restore the session's start on `Main` | `docs/04-agent-model-and-thinking.md` |
 | README, personal install, the keybinding prerequisite documented | `README.md` |
-| Release metadata and an MIT licence: `description`, `keywords: ["pi-package"]`, `engines`, `files`, CI workflow, 58 test cases — `0.1.0` shipped 2026-11-15, `0.1.1` is the same tree plus the copyable keybinding file | `docs/05-release-packaging.md` |
+| Release metadata and an MIT licence: `description`, `keywords: ["pi-package"]`, `engines`, `files`, CI workflow — `0.1.0` shipped 2026-11-15, `0.1.1` added the copyable keybinding file, `0.1.2` added the second shortcut on `f2` and 60 test cases | `docs/05-release-packaging.md`, `docs/07-second-shortcut.md` |
 
 ## Suggested order
 
