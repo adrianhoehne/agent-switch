@@ -9,8 +9,9 @@ Implemented on 2026-11-15, after the release. Small in code, but it reverses a d
 `docs/03` recorded deliberately, and that reversal is dated in both places: here in
 `## Log`, and in `docs/03` itself.
 
-Criteria 1–9 are verified. Criterion 10 — pressing `f2` in a real session with no
-keybinding file — is the operator's check and is outstanding at the time of writing.
+All ten criteria are verified. Criterion 10 passed on 2026-11-15: with the keybinding
+file moved aside, `f2` changed the footer from `Main` to an agent name, and pi reported
+the expected `shift+tab` conflict in its `[Extension issues]` block.
 
 ## Goal
 
@@ -489,6 +490,7 @@ finding in `## Log`, and they settle the gate.
 | 2026-11-15 | review R4 m4: two ranges for one paragraph | taken — `:199`–`:204` in both |
 | 2026-11-15 | review R4 m5: Log rows lumped several minors | taken — one row per finding from R2 and R3 on |
 | 2026-11-15 | review R4 m6: `docs/03:52`'s `35 passed` was already false | taken — stated as a debt this spec does not own |
+| 2026-11-15 | criterion 10: the live check | operator: `~/.pi/agent/keybindings.json` moved aside, `pi --extension ./src/extension.ts`, `f2` changed the footer from `Main` to an agent name; `shift+tab` was skipped with the expected `[Extension issues]` line. The file was restored afterwards |
 | 2026-11-15 | code review: verdict | 🔧 first round, then ✅ after the two documented blockers were closed by replacement. The code and the suite were signed off in the first round; both blockers were in `docs/`, which the orchestrator owns |
 | 2026-11-15 | code review: docs/03:137 spliced instead of replaced, docs/01 stray double backtick, two dead proof literals | taken — the clause is replaced, the backtick removed, and `No second shortcut`/`the registered key is exactly` retargeted to `second shortcut`/`registered keys are exactly` |
 | 2026-11-15 | orchestrator, after round 4: two proofs contradicted their own amendment wording | taken — "re-scoped to `shift+tab`" keeps the phrase, so stage 4 expects one line there instead of none; `docs/03:67`'s "No new case" sentence is genuinely replaced so its grep still expects nothing |
